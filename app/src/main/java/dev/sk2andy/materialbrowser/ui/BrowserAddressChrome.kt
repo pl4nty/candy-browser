@@ -12,6 +12,7 @@ import android.widget.Toast
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.AnimationVector1D
 import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -20,6 +21,7 @@ import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.ime
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -647,6 +649,59 @@ internal fun BoxScope.BrowserAddressChrome(
                 },
             ),
     )
+
+    if (
+        controller.isFastActionButtonEnabled &&
+        !tabOverviewVisible &&
+        !tabOverviewOpening &&
+        !addressEditorVisible &&
+        !settingsVisible &&
+        commandFeedback == null
+    ) {
+        val density = LocalDensity.current
+        val navigationBarBottomPx = WindowInsets.navigationBars.getBottom(density)
+        // Sit above the floating pill; when it is docked or not measured, sit above the nav bar.
+        val targetBottomPadding = with(density) {
+            val barTop = bottomBarTopPx.floatValue
+            if (barTop.isFinite() && barTop in 0f..browserHeightPx) {
+                (browserHeightPx - barTop).toDp() + 12.dp
+            } else {
+                navigationBarBottomPx.toDp() + 16.dp
+            }
+        }
+        val fastActionBottomPadding by animateDpAsState(
+            targetValue = targetBottomPadding,
+            label = "fastActionBottomPadding",
+        )
+        FastActionButton(
+            actions = FastActionButtonRules.DefaultActions,
+            availability = FastActionAvailability(
+                canGoBack = selectedTab.canGoBack,
+                canGoForward = selectedTab.canGoForward,
+                canUsePageActions = selectedTab.url != BLANK_URL,
+                canCloseTab = true,
+            ),
+            tabCount = controller.activeTabs.size,
+            isLoading = selectedTab.isLoading,
+            bottomPadding = fastActionBottomPadding,
+            onAction = { action ->
+                when (action) {
+                    FastAction.Search -> openAddressEditor()
+                    FastAction.Back -> controller.goBack()
+                    FastAction.Forward -> controller.goForward()
+                    FastAction.Reload -> if (selectedTab.isLoading) {
+                        controller.stopLoading()
+                    } else {
+                        controller.reload()
+                    }
+                    FastAction.Tabs -> onTabs()
+                    FastAction.NewTab -> openNewTabAndEdit()
+                    FastAction.CloseTab -> controller.closeTabFromUser(selectedTab.id)
+                    FastAction.Home -> controller.openNormalHome()
+                }
+            },
+        )
+    }
 
     if (
         !selectedTab.isIncognito &&
