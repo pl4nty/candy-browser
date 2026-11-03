@@ -32,6 +32,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.MutableFloatState
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -221,7 +222,22 @@ internal fun BoxScope.BrowserAddressChrome(
         }
     }
 
-    val addressBarDockingAvailable = AddressBarDockingRules.isAvailable(
+    // Option B of the fast action button: it stands in for the address pill, which only appears
+    // while editing, in the tab overview, for command feedback, or to host its main menu.
+    val fastActionReplacesBar = controller.isFastActionButtonEnabled &&
+        controller.isFastActionButtonReplacingAddressBar
+    var fastActionMenuRequestId by remember { mutableIntStateOf(0) }
+    var fastActionMenuPending by remember { mutableStateOf(false) }
+    var addressBarMenuOpen by remember { mutableStateOf(false) }
+    val addressBarShown = !fastActionReplacesBar ||
+        addressEditorVisible ||
+        commandFeedback != null ||
+        tabOverviewVisible ||
+        tabOverviewOpening ||
+        addressBarMorphInFront ||
+        fastActionMenuPending ||
+        addressBarMenuOpen
+    val addressBarDockingAvailable = !fastActionReplacesBar && AddressBarDockingRules.isAvailable(
         settingEnabled = controller.isAddressBarDockingEnabled,
         isBlankTab = selectedTab.url == BLANK_URL,
     )
@@ -256,6 +272,12 @@ internal fun BoxScope.BrowserAddressChrome(
         ),
     )
     var addressBarBoundsInRoot by remember { mutableStateOf<Rect?>(null) }
+    LaunchedEffect(addressBarShown) {
+        if (!addressBarShown) {
+            addressBarBoundsInRoot = null
+            bottomBarTopPx.floatValue = Float.NaN
+        }
+    }
     val autoDockGeometryAvailable = addressBarDockingAvailable &&
         effectiveAddressBarDockPlacement == null &&
         !addressEditorVisible &&
@@ -287,12 +309,18 @@ internal fun BoxScope.BrowserAddressChrome(
     DisposableEffect(controller) {
         onDispose(controller::clearAddressBarBoundsInViewport)
     }
-    BrowserBottomBar(
+    if (addressBarShown) BrowserBottomBar(
         onOpenMenuSettings = onOpenMenuSettings,
         menuDismissRequestId = menuDismissRequestId,
+        menuOpenRequestId = if (fastActionMenuPending) fastActionMenuRequestId else 0,
+        onMenuOpenChanged = { open ->
+            addressBarMenuOpen = open
+            if (open) fastActionMenuPending = false
+        },
         tab = selectedTab,
         pageTranslationProvider = controller.pageTranslationProvider,
         compact = controller.isBottomBarCompact &&
+            !fastActionReplacesBar &&
             !linkPeekAddressBarExpanded &&
             !wideWindow,
         dockState = AddressBarDockState(
@@ -656,6 +684,7 @@ internal fun BoxScope.BrowserAddressChrome(
         !tabOverviewOpening &&
         !addressEditorVisible &&
         !settingsVisible &&
+        !addressBarMenuOpen &&
         commandFeedback == null
     ) {
         val density = LocalDensity.current
@@ -673,10 +702,11 @@ internal fun BoxScope.BrowserAddressChrome(
             targetValue = targetBottomPadding,
             label = "fastActionBottomPadding",
         )
-        val recentFastActionTabs = remember(controller.activeTabs) {
+        val recentFastActionTabs = remember(controller.activeTabs, fastActionReplacesBar) {
             val tabsById = controller.activeTabs.associateBy(BrowserTab::id)
             FastActionButtonRules.recentTabIds(
                 controller.activeTabs.map { FastActionTabRecency(it.id, it.lastAccessedAt) },
+                max = FastActionButtonRules.maxRecentTabs(includeMenu = fastActionReplacesBar),
             ).mapNotNull(tabsById::get)
         }
         FastActionButton(
@@ -708,6 +738,12 @@ internal fun BoxScope.BrowserAddressChrome(
                 if (tabId != selectedTab.id) controller.selectTab(tabId)
             },
             onTabs = onTabs,
+            showMenu = fastActionReplacesBar,
+            onMenu = {
+                fastActionMenuRequestId += 1
+                fastActionMenuPending = true
+            },
+            onTap = if (fastActionReplacesBar) openAddressEditor else null,
         )
     }
 

@@ -154,4 +154,43 @@ class FastActionButtonRulesTest {
         assertEquals(emptyList<String>(), FastActionButtonRules.recentTabIds(tabs, max = 0))
         assertEquals(listOf("a"), FastActionButtonRules.recentTabIds(tabs.take(1)))
     }
+
+    @Test
+    fun `outer arc lists recent tabs then the overview`() {
+        assertEquals(
+            listOf(
+                FastActionOuterItem.Tab("a"),
+                FastActionOuterItem.Tab("b"),
+                FastActionOuterItem.Tab("c"),
+                FastActionOuterItem.Tab("d"),
+                FastActionOuterItem.Overview,
+            ),
+            FastActionButtonRules.outerItems(listOf("a", "b", "c", "d"), includeMenu = false),
+        )
+        assertEquals(
+            listOf(FastActionOuterItem.Overview),
+            FastActionButtonRules.outerItems(emptyList(), includeMenu = false),
+        )
+    }
+
+    @Test
+    fun `replacing the address bar trades the oldest tab for the menu at the left end`() {
+        val items = FastActionButtonRules.outerItems(listOf("a", "b", "c", "d"), includeMenu = true)
+        assertEquals(
+            listOf(
+                FastActionOuterItem.Menu,
+                FastActionOuterItem.Tab("b"),
+                FastActionOuterItem.Tab("c"),
+                FastActionOuterItem.Tab("d"),
+                FastActionOuterItem.Overview,
+            ),
+            items,
+        )
+        assertEquals(outerCount, items.size)
+        assertEquals(3, FastActionButtonRules.maxRecentTabs(includeMenu = true))
+        assertEquals(
+            listOf(FastActionOuterItem.Menu, FastActionOuterItem.Tab("a"), FastActionOuterItem.Overview),
+            FastActionButtonRules.outerItems(listOf("a"), includeMenu = true),
+        )
+    }
 }

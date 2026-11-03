@@ -233,6 +233,7 @@ internal fun BrowserSettingsOverlay(
             isAddressBarDockingEnabled = controller.isAddressBarDockingEnabled,
             isAddressBarSwipeModeEnabled = controller.isAddressBarSwipeModeEnabled,
             isFastActionButtonEnabled = controller.isFastActionButtonEnabled,
+            isFastActionButtonReplacingAddressBar = controller.isFastActionButtonReplacingAddressBar,
             isExternalLinkPreviewEnabled = controller.isExternalLinkPreviewEnabled,
             externalLinkPreviewProfileId = controller.externalLinkPreviewProfileId,
             externalLinkPreviewProfiles = controller.externalLinkPreviewProfiles,
@@ -337,6 +338,8 @@ internal fun BrowserSettingsOverlay(
             onAddressBarSwipeModeEnabledChanged =
                 controller::updateAddressBarSwipeModeEnabled,
             onFastActionButtonEnabledChanged = controller::updateFastActionButtonEnabled,
+            onFastActionButtonReplacesAddressBarChanged =
+                controller::updateFastActionButtonReplacesAddressBar,
             onExternalLinkPreviewEnabledChanged =
                 controller::updateExternalLinkPreviewEnabled,
             onExternalLinkPreviewProfileChanged = controller::updateExternalLinkPreviewProfile,

@@ -593,6 +593,8 @@
     <string name="settings_address_bar_swipe_mode_summary">在页面上向下滑动展开地址栏，向上滑动收起地址栏，即使页面无法滚动也可使用。关闭后，地址栏跟随页面滚动变化。</string>
     <string name="settings_fast_action_button_title">快速操作按钮</string>
     <string name="settings_fast_action_button_summary">显示一个悬浮按钮。轻点可打开快捷操作，按住并滑向某个操作即可执行。</string>
+    <string name="settings_fast_action_button_replaces_address_bar_title">替换地址栏</string>
+    <string name="settings_fast_action_button_replaces_address_bar_summary">隐藏地址栏胶囊。轻点按钮可编辑地址，按住并滑动可使用操作、最近的标签页和菜单。</string>
     <string name="cd_fast_action_button">快速操作</string>
     <string name="settings_address_bar_docking_subtitle">拖拉停放的药丸,并在任何高度放下,将其到最近的屏幕边缘. 关闭以保持地址的中心.</string>
     <string name="settings_tab_dismiss_resistance">标签释放阻力</string>
