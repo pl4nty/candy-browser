@@ -915,6 +915,8 @@ class BrowserController(
         private set
     var isFastActionButtonEnabled by mutableStateOf(false)
         private set
+    var isFastActionButtonReplacingAddressBar by mutableStateOf(false)
+        private set
     var isStartupAnimationEnabled by mutableStateOf(true)
         private set
     var startupAddressFocusMode by mutableStateOf(StartupAddressFocusMode.Default)
@@ -2946,6 +2948,7 @@ class BrowserController(
         isFullImmersiveModeEnabled = store.loadFullImmersiveModeEnabled()
         isAddressBarSwipeModeEnabled = store.loadAddressBarSwipeModeEnabled()
         isFastActionButtonEnabled = store.loadFastActionButtonEnabled()
+        isFastActionButtonReplacingAddressBar = store.loadFastActionButtonReplacesAddressBar()
         isStartupAnimationEnabled = store.loadStartupAnimationEnabled()
         startupAddressFocusMode = store.loadStartupAddressFocusMode()
         isHttpPasswordAutofillEnabled = store.loadHttpPasswordAutofillEnabled()
@@ -11047,6 +11050,12 @@ class BrowserController(
         if (isFastActionButtonEnabled == enabled) return
         isFastActionButtonEnabled = enabled
         store.saveFastActionButtonEnabled(enabled)
+    }
+
+    fun updateFastActionButtonReplacesAddressBar(enabled: Boolean) {
+        if (isFastActionButtonReplacingAddressBar == enabled) return
+        isFastActionButtonReplacingAddressBar = enabled
+        store.saveFastActionButtonReplacesAddressBar(enabled)
     }
 
     fun updateStartupAnimationEnabled(enabled: Boolean) {
