@@ -9,7 +9,7 @@ import kotlin.math.sin
 
 /** Page actions on the inner ring of the fast action button. */
 internal enum class FastAction(val wireValue: String) {
-    Back("back"),
+    Reload("reload"),
     CloseTab("close_tab"),
     Search("search"),
     NewTab("new_tab"),
@@ -28,8 +28,8 @@ internal data class FastActionOffset(
 )
 
 internal data class FastActionAvailability(
-    val canGoBack: Boolean,
-    val canUsePageActions: Boolean,
+    val canReload: Boolean,
+    val canShare: Boolean,
     val canCloseTab: Boolean,
 )
 
@@ -63,7 +63,7 @@ internal sealed interface FastActionTarget {
 internal object FastActionButtonRules {
     /** Inner ring, from the left end of the half-disc to the right end in left-to-right layouts. */
     val InnerActions: List<FastAction> = listOf(
-        FastAction.Back,
+        FastAction.Reload,
         FastAction.CloseTab,
         FastAction.Search,
         FastAction.NewTab,
@@ -76,7 +76,7 @@ internal object FastActionButtonRules {
     const val OUTER_END_DEGREES = 20f
 
     /** Recent tabs shown on the outer arc, before the tab-overview bubble. */
-    const val MAX_RECENT_TABS = 3
+    const val MAX_RECENT_TABS = 4
 
     /** Fraction of the inner radius a drag must travel before anything is highlighted. */
     const val ACTIVATION_RADIUS_FRACTION = 0.45f
@@ -89,9 +89,9 @@ internal object FastActionButtonRules {
 
     fun isEnabled(action: FastAction, availability: FastActionAvailability): Boolean =
         when (action) {
-            FastAction.Back -> availability.canGoBack
+            FastAction.Reload -> availability.canReload
             FastAction.CloseTab -> availability.canCloseTab
-            FastAction.Share -> availability.canUsePageActions
+            FastAction.Share -> availability.canShare
             FastAction.Search,
             FastAction.NewTab,
             -> true
