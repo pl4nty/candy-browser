@@ -621,6 +621,8 @@
     <string name="settings_address_bar_swipe_mode_summary">Проведите вниз по странице, чтобы развернуть строку, или вверх, чтобы свернуть её, даже если страница не прокручивается. Если отключено, строка реагирует на прокрутку страницы.</string>
     <string name="settings_fast_action_button_title">Кнопка быстрых действий</string>
     <string name="settings_fast_action_button_summary">Показывает плавающую кнопку. Нажмите для быстрых действий или зажмите и проведите к действию.</string>
+    <string name="settings_fast_action_button_replaces_address_bar_title">Заменить адресную строку</string>
+    <string name="settings_fast_action_button_replaces_address_bar_summary">Скрывает адресную строку. Нажмите кнопку, чтобы изменить адрес, или удерживайте и проведите для действий, недавних вкладок и меню.</string>
     <string name="cd_fast_action_button">Быстрые действия</string>
     <string name="settings_address_bar_docking_subtitle">Перетащите свёрнутую строку и отпустите на любой высоте, чтобы закрепить её у ближайшего края экрана. Отключите, чтобы адресная строка оставалась по центру.</string>
     <string name="settings_tab_dismiss_resistance">Сопротивление закрытию вкладки</string>

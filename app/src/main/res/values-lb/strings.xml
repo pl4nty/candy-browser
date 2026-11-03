@@ -601,6 +601,8 @@
     <string name="settings_address_bar_swipe_mode_summary">Wësch op der Säit no ënnen, fir d’Adressleescht auszebauen, an no uewen, fir se kompakt ze maachen, och wann d’Säit net scrollt. Wann ausgeschalt, follegt d’Adressleescht dem Scrolle vun der Säit.</string>
     <string name="settings_fast_action_button_title">Knäppche fir séier Aktiounen</string>
     <string name="settings_fast_action_button_summary">Weist e schwiewende Knäppchen. Tippt drop fir séier Aktiounen, oder dréckt a schléift op eng Aktioun.</string>
+    <string name="settings_fast_action_button_replaces_address_bar_title">Adressbar ersetzen</string>
+    <string name="settings_fast_action_button_replaces_address_bar_summary">Verstoppt d\'Adresspëll. Tippt op de Knäppchen fir d\'Adress z\'änneren, oder haalt a wëscht fir Aktiounen, rezent Tabs an de Menü.</string>
     <string name="cd_fast_action_button">Séier Aktiounen</string>
     <string name="settings_address_bar_docking_subtitle">Zéi dat geparkten Feld a looss et op enger Héicht lass, fir et un den nooste Bildschiermrand ze pechen. Ausschalten hält d’Adressleescht an der Mëtt.</string>
     <string name="settings_tab_dismiss_resistance">Widderstand beim Zoumaache vun Tabs</string>

@@ -676,6 +676,8 @@
     <string name="settings_address_bar_swipe_mode_summary">Swipe down on the page to expand the pill and up to compact it, even when the page cannot scroll. When off, the pill follows page scrolling.</string>
     <string name="settings_fast_action_button_title">Fast action button</string>
     <string name="settings_fast_action_button_summary">Show a floating button. Tap it for quick actions, or press and slide to an action.</string>
+    <string name="settings_fast_action_button_replaces_address_bar_title">Replace the address bar</string>
+    <string name="settings_fast_action_button_replaces_address_bar_summary">Hide the address pill. Tap the button to edit the address, or hold and slide for actions, recent tabs and the menu.</string>
     <string name="cd_fast_action_button">Fast actions</string>
     <string name="settings_address_bar_docking_subtitle">Drag the parked pill and release it at any height to snap it to the nearest screen edge. Turn off to keep the address bar centered.</string>
     <string name="settings_tab_dismiss_resistance">Tab dismissal resistance</string>

@@ -280,6 +280,11 @@ internal fun settingsSearchDefinitions(
             descriptionRes = R.string.settings_fast_action_button_summary,
         )
         setting(
+            id = "settings_fast_action_button_replaces_address_bar_title",
+            titleRes = R.string.settings_fast_action_button_replaces_address_bar_title,
+            descriptionRes = R.string.settings_fast_action_button_replaces_address_bar_summary,
+        )
+        setting(
             id = "settings_status_bar_scroll_title",
             titleRes = R.string.settings_status_bar_scroll_title,
             descriptionRes = R.string.settings_status_bar_scroll_summary,
@@ -997,6 +1002,7 @@ internal fun settingsSearchDefinitions(
         "settings_profiles_title", "guest_bubble_title" -> SettingsDestination.ProfileOptions
         "settings_address_bar_docking_title", "settings_address_bar_swipe_mode_title",
         "settings_fast_action_button_title",
+        "settings_fast_action_button_replaces_address_bar_title",
         "settings_tab_dismiss_resistance", "settings_status_bar_scroll_title",
         "settings_status_bar_scroll_width_title" -> SettingsDestination.GestureControls
         "settings_link_long_press_action" -> SettingsDestination.LinkLongPress
