@@ -125,14 +125,19 @@ internal object FastActionButtonRules {
         if (includeMenu) MAX_RECENT_TABS_WITH_MENU else MAX_RECENT_TABS
 
     /**
-     * Outer arc from its left end to its right end in left-to-right layouts: the menu bubble when
-     * [includeMenu] is set, then the newest recent tabs oldest first, then the tab overview.
-     * RTL layouts mirror the arc, as for the angles.
+     * Outer arc from its left end to its right end in left-to-right layouts, from [recentTabIds]
+     * ordered oldest first. RTL layouts mirror the arc, as for the angles.
+     *
+     * - Without the menu: the newest tabs oldest first, then the tab overview, so the current tab
+     *   sits next to the overview.
+     * - With the menu: the newest tabs newest first, so the current tab takes the left end and the
+     *   oldest shown tab the middle, then the tab overview, then the menu at the right end.
      */
     fun outerItems(recentTabIds: List<String>, includeMenu: Boolean): List<FastActionOuterItem> = buildList {
-        if (includeMenu) add(FastActionOuterItem.Menu)
-        recentTabIds.takeLast(maxRecentTabs(includeMenu)).forEach { add(FastActionOuterItem.Tab(it)) }
+        val tabs = recentTabIds.takeLast(maxRecentTabs(includeMenu))
+        (if (includeMenu) tabs.asReversed() else tabs).forEach { add(FastActionOuterItem.Tab(it)) }
         add(FastActionOuterItem.Overview)
+        if (includeMenu) add(FastActionOuterItem.Menu)
     }
 
     /** Evenly spread angles from [start] to [end]; RTL mirrors them across the vertical axis. */
