@@ -603,6 +603,8 @@
     <string name="settings_address_bar_swipe_mode_summary">Rrëshqit poshtë në faqe për të zgjeruar shiritin dhe lart për ta ngjeshur, edhe kur faqja nuk mund të lëvizë. Kur është çaktivizuar, shiriti ndjek lëvizjen e faqes.</string>
     <string name="settings_fast_action_button_title">Butoni i veprimeve të shpejta</string>
     <string name="settings_fast_action_button_summary">Shfaq një buton pluskues. Prekeni për veprime të shpejta, ose shtypeni dhe rrëshqitni te një veprim.</string>
+    <string name="settings_fast_action_button_replaces_address_bar_title">Zëvendëso shiritin e adresës</string>
+    <string name="settings_fast_action_button_replaces_address_bar_summary">Fsheh shiritin e adresës. Prek butonin për të ndryshuar adresën, ose mbaje dhe rrëshqit për veprime, skeda të fundit dhe menynë.</string>
     <string name="cd_fast_action_button">Veprime të shpejta</string>
     <string name="settings_address_bar_docking_subtitle">Nxirrni pilulën e parkuar dhe lironi në çdo lartësi për ta vendosur në skajin më të afërt të ekranit. Fikeni për të mbajtur shiritin e adresës në qendër.</string>
     <string name="settings_tab_dismiss_resistance">Rezistenca gjatë mbylljes së skedës</string>

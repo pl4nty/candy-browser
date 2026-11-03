@@ -44,11 +44,19 @@ internal sealed interface FastActionTarget {
     /** An entry of [FastActionButtonRules.InnerActions]. */
     data class Inner(val index: Int) : FastActionTarget
 
-    /**
-     * An outer bubble: indices below the recent-tab count are recent tabs, and the last index is
-     * the tab overview.
-     */
+    /** An entry of the outer arc, as listed by [FastActionButtonRules.outerItems]. */
     data class Outer(val index: Int) : FastActionTarget
+}
+
+/** A bubble on the outer arc. */
+internal sealed interface FastActionOuterItem {
+    data class Tab(val id: String) : FastActionOuterItem
+
+    /** Opens the tab overview. */
+    data object Overview : FastActionOuterItem
+
+    /** Opens the address pill's main menu; shown when the button replaces the address bar. */
+    data object Menu : FastActionOuterItem
 }
 
 /**
@@ -77,6 +85,9 @@ internal object FastActionButtonRules {
 
     /** Recent tabs shown on the outer arc, before the tab-overview bubble. */
     const val MAX_RECENT_TABS = 4
+
+    /** Recent tabs shown when the menu bubble takes one outer slot. */
+    const val MAX_RECENT_TABS_WITH_MENU = 3
 
     /** Fraction of the inner radius a drag must travel before anything is highlighted. */
     const val ACTIVATION_RADIUS_FRACTION = 0.45f
@@ -108,6 +119,20 @@ internal object FastActionButtonRules {
             .take(max)
             .reversed()
             .map(FastActionTabRecency::id)
+    }
+
+    fun maxRecentTabs(includeMenu: Boolean): Int =
+        if (includeMenu) MAX_RECENT_TABS_WITH_MENU else MAX_RECENT_TABS
+
+    /**
+     * Outer arc from its left end to its right end in left-to-right layouts: the menu bubble when
+     * [includeMenu] is set, then the newest recent tabs oldest first, then the tab overview.
+     * RTL layouts mirror the arc, as for the angles.
+     */
+    fun outerItems(recentTabIds: List<String>, includeMenu: Boolean): List<FastActionOuterItem> = buildList {
+        if (includeMenu) add(FastActionOuterItem.Menu)
+        recentTabIds.takeLast(maxRecentTabs(includeMenu)).forEach { add(FastActionOuterItem.Tab(it)) }
+        add(FastActionOuterItem.Overview)
     }
 
     /** Evenly spread angles from [start] to [end]; RTL mirrors them across the vertical axis. */

@@ -603,6 +603,8 @@
     <string name="settings_address_bar_swipe_mode_summary">Stryg ned på siden for at udvide adresselinjen og op for at gøre den kompakt, også når siden ikke kan rulles. Når dette er slået fra, følger adresselinjen sidens rulning.</string>
     <string name="settings_fast_action_button_title">Knap til hurtige handlinger</string>
     <string name="settings_fast_action_button_summary">Vis en svævende knap. Tryk for hurtige handlinger, eller tryk og stryg hen til en handling.</string>
+    <string name="settings_fast_action_button_replaces_address_bar_title">Erstat adresselinjen</string>
+    <string name="settings_fast_action_button_replaces_address_bar_summary">Skjul adressepillen. Tryk på knappen for at redigere adressen, eller hold og skub for handlinger, seneste faner og menuen.</string>
     <string name="cd_fast_action_button">Hurtige handlinger</string>
     <string name="settings_address_bar_docking_subtitle">Træk det parkerede felt og slip det i en vilkårlig højde for at fastgøre det til nærmeste skærmkant. Slå fra for at holde adresselinjen centreret.</string>
     <string name="settings_tab_dismiss_resistance">Modstand ved lukning af faner</string>

@@ -26,6 +26,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.Icon
@@ -68,6 +69,7 @@ internal object FastActionButtonTestTags {
     const val Button = "fast_action_button"
     const val Scrim = "fast_action_button_scrim"
     const val Overview = "fast_action:tabs"
+    const val Menu = "fast_action:menu"
     fun action(action: FastAction): String = "fast_action:${action.wireValue}"
     fun tab(tabId: String): String = "fast_action_tab:$tabId"
 }
@@ -81,11 +83,14 @@ private val OuterRadius = 150.dp
 private val DiscRadius = OuterRadius
 
 /**
- * Centred floating button modelled on Opera GX's fast action button. A tap toggles a half-disc
+ * Centred floating button modelled on Opera GX's fast action button. Pressing it grows a half-disc
  * with page actions on an inner ring and recent tabs plus the tab overview on an outer arc;
- * pressing and sliding toward an item highlights it and runs it on release.
+ * sliding toward an item highlights it and runs it on release.
  *
  * @param recentTabs outer-arc tabs, oldest first, as ordered by [FastActionButtonRules.recentTabIds].
+ * @param showMenu adds the main-menu bubble at the start of the outer arc, in place of one tab.
+ * @param onTap when set, a quick tap runs it instead of opening the disc, and the disc opens on
+ * hold or slide. Used when the button replaces the address bar, so a tap edits the address.
  */
 @Composable
 internal fun BoxScope.FastActionButton(
@@ -100,6 +105,9 @@ internal fun BoxScope.FastActionButton(
     onSelectTab: (String) -> Unit,
     onTabs: () -> Unit,
     modifier: Modifier = Modifier,
+    showMenu: Boolean = false,
+    onMenu: () -> Unit = {},
+    onTap: (() -> Unit)? = null,
 ) {
     val view = LocalView.current
     val density = LocalDensity.current
@@ -108,7 +116,11 @@ internal fun BoxScope.FastActionButton(
     val outerRadiusPx = with(density) { OuterRadius.toPx() }
     val actions = FastActionButtonRules.InnerActions
     val innerEnabled = actions.map { FastActionButtonRules.isEnabled(it, availability) }
-    val outerCount = recentTabs.size + 1
+    val tabsById = remember(recentTabs) { recentTabs.associateBy(BrowserTab::id) }
+    val outerItems = remember(recentTabs, showMenu) {
+        FastActionButtonRules.outerItems(recentTabs.map(BrowserTab::id), includeMenu = showMenu)
+    }
+    val outerCount = outerItems.size
     val innerOffsets = remember(isRtl, innerRadiusPx) {
         FastActionButtonRules.offsets(FastActionButtonRules.innerAngles(actions.size, isRtl), innerRadiusPx)
     }
@@ -130,10 +142,12 @@ internal fun BoxScope.FastActionButton(
     )
     val currentInnerEnabled by rememberUpdatedState(innerEnabled)
     val currentOuterCount by rememberUpdatedState(outerCount)
-    val currentRecentTabs by rememberUpdatedState(recentTabs)
+    val currentOuterItems by rememberUpdatedState(outerItems)
     val currentOnAction by rememberUpdatedState(onAction)
     val currentOnSelectTab by rememberUpdatedState(onSelectTab)
     val currentOnTabs by rememberUpdatedState(onTabs)
+    val currentOnMenu by rememberUpdatedState(onMenu)
+    val currentOnTap by rememberUpdatedState(onTap)
 
     fun close() {
         expanded = false
@@ -145,9 +159,11 @@ internal fun BoxScope.FastActionButton(
         view.performConfirmHaptic()
         when (target) {
             is FastActionTarget.Inner -> currentOnAction(actions[target.index])
-            is FastActionTarget.Outer -> {
-                val tab = currentRecentTabs.getOrNull(target.index)
-                if (tab != null) currentOnSelectTab(tab.id) else currentOnTabs()
+            is FastActionTarget.Outer -> when (val item = currentOuterItems.getOrNull(target.index)) {
+                is FastActionOuterItem.Tab -> currentOnSelectTab(item.id)
+                FastActionOuterItem.Overview -> currentOnTabs()
+                FastActionOuterItem.Menu -> currentOnMenu()
+                null -> Unit
             }
         }
     }
@@ -220,13 +236,17 @@ internal fun BoxScope.FastActionButton(
                 }
             }
         }
-        repeat(outerCount) { index ->
-            val tab = recentTabs.getOrNull(index)
+        outerItems.forEachIndexed { index, item ->
+            val tab = (item as? FastActionOuterItem.Tab)?.let { tabsById[it.id] }
             val isHighlighted = highlighted == FastActionTarget.Outer(index)
-            val label = if (tab != null) displayTabTitle(tab) else stringResource(R.string.address_bar_action_tabs)
+            val label = item.label(tabsById)
             Surface(
                 shape = CircleShape,
-                color = if (tab == null) MaterialTheme.colorScheme.surface else MaterialTheme.colorScheme.surfaceContainerHighest,
+                color = if (item is FastActionOuterItem.Tab) {
+                    MaterialTheme.colorScheme.surfaceContainerHighest
+                } else {
+                    MaterialTheme.colorScheme.surface
+                },
                 contentColor = MaterialTheme.colorScheme.primary,
                 border = if (tab != null && tab.id == selectedTabId) {
                     BorderStroke(3.dp, MaterialTheme.colorScheme.primary)
@@ -240,15 +260,21 @@ internal fun BoxScope.FastActionButton(
                     .size(OuterItemSize)
                     .scale(if (isHighlighted) 1.18f else 0.6f + 0.4f * progress)
                     .graphicsLayer { alpha = progress.coerceIn(0f, 1f) }
-                    .testTag(tab?.let { FastActionButtonTestTags.tab(it.id) } ?: FastActionButtonTestTags.Overview)
+                    .testTag(
+                        when (item) {
+                            is FastActionOuterItem.Tab -> FastActionButtonTestTags.tab(item.id)
+                            FastActionOuterItem.Overview -> FastActionButtonTestTags.Overview
+                            FastActionOuterItem.Menu -> FastActionButtonTestTags.Menu
+                        },
+                    )
                     .semantics { contentDescription = label }
                     .clickable(enabled = expanded) { run(FastActionTarget.Outer(index)) },
             ) {
                 Box(contentAlignment = Alignment.Center) {
-                    if (tab != null) {
-                        TabFavicon(tab = tab, favicon = favicons[tab.id], size = 28.dp)
-                    } else {
-                        AddressBarTabCounterGlyph(tabCount = tabCount)
+                    when {
+                        tab != null -> TabFavicon(tab = tab, favicon = favicons[tab.id], size = 28.dp)
+                        item == FastActionOuterItem.Menu -> Icon(Icons.Default.MoreVert, null)
+                        else -> AddressBarTabCounterGlyph(tabCount = tabCount)
                     }
                 }
             }
@@ -256,8 +282,7 @@ internal fun BoxScope.FastActionButton(
         highlighted?.let { target ->
             val text = when (target) {
                 is FastActionTarget.Inner -> stringResource(actions[target.index].labelRes())
-                is FastActionTarget.Outer -> recentTabs.getOrNull(target.index)?.let { displayTabTitle(it) }
-                    ?: stringResource(R.string.address_bar_action_tabs)
+                is FastActionTarget.Outer -> outerItems.getOrNull(target.index)?.label(tabsById).orEmpty()
             }
             Surface(
                 shape = RoundedCornerShape(12.dp),
@@ -295,15 +320,47 @@ internal fun BoxScope.FastActionButton(
             .pointerInput(isRtl, innerRadiusPx, outerRadiusPx) {
                 awaitEachGesture {
                     val down = awaitFirstDown()
-                    // Pressing opens the disc straight away so it can grow while held.
                     val openedByPress = !expanded
+                    var dragging = false
+                    var total = Offset.Zero
+                    val tap = currentOnTap
+                    if (openedByPress && tap != null) {
+                        // A quick tap runs onTap; holding or sliding opens the disc instead.
+                        val outcome = withTimeoutOrNull(viewConfiguration.longPressTimeoutMillis) {
+                            var result = PressOutcome.Cancelled
+                            while (true) {
+                                val change = awaitPointerEvent().changes.firstOrNull { it.id == down.id } ?: break
+                                if (!change.pressed) {
+                                    change.consume()
+                                    result = PressOutcome.Tap
+                                    break
+                                }
+                                total += change.positionChange()
+                                if (total.getDistance() > viewConfiguration.touchSlop) {
+                                    change.consume()
+                                    result = PressOutcome.Slide
+                                    break
+                                }
+                            }
+                            result
+                        } ?: PressOutcome.Hold
+                        when (outcome) {
+                            PressOutcome.Tap -> {
+                                view.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
+                                tap()
+                                return@awaitEachGesture
+                            }
+                            PressOutcome.Cancelled -> return@awaitEachGesture
+                            PressOutcome.Slide -> dragging = true
+                            PressOutcome.Hold -> Unit
+                        }
+                    }
+                    // Without onTap, pressing opens the disc straight away so it grows while held.
                     if (openedByPress) {
                         expanded = true
                         highlighted = null
                         view.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
                     }
-                    var dragging = false
-                    var total = Offset.Zero
                     while (true) {
                         val event = awaitPointerEvent()
                         val change = event.changes.firstOrNull { it.id == down.id } ?: break
@@ -351,6 +408,15 @@ internal fun BoxScope.FastActionButton(
             )
         }
     }
+}
+
+private enum class PressOutcome { Tap, Slide, Hold, Cancelled }
+
+@Composable
+private fun FastActionOuterItem.label(tabsById: Map<String, BrowserTab>): String = when (this) {
+    is FastActionOuterItem.Tab -> tabsById[id]?.let { displayTabTitle(it) }.orEmpty()
+    FastActionOuterItem.Overview -> stringResource(R.string.address_bar_action_tabs)
+    FastActionOuterItem.Menu -> stringResource(R.string.cd_more_options)
 }
 
 @Composable
