@@ -1,0 +1,30 @@
+name: Rebase onto upstream release
+
+on:
+  schedule:
+    - cron: "0 3 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  rebase:
+    if: github.repository == 'pl4nty/candy-browser'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.FAB_SYNC_TOKEN }}
+
+      - name: Rebase and release
+        env:
+          GH_TOKEN: ${{ secrets.FAB_SYNC_TOKEN }}
+        run: |
+          tag="$(gh release view --repo sk2andy/candy-browser --json tagName --jq .tagName)"
+          if gh release view "$tag" >/dev/null 2>&1; then exit 0; fi
+          git fetch --no-tags https://github.com/sk2andy/candy-browser "refs/tags/$tag"
+          git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' rebase FETCH_HEAD
+          git push --force-with-lease origin "HEAD:$GITHUB_REF_NAME"
+          gh workflow run release.yml --ref "$GITHUB_REF_NAME" -f version="${tag#v}" -f changelog="release-notes/${tag#v}.md" -f prerelease=false -f publish_play=false
