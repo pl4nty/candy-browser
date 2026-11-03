@@ -7,28 +7,19 @@ import kotlin.math.cos
 import kotlin.math.hypot
 import kotlin.math.sin
 
-/** Actions reachable from the floating fast action button. */
+/** Page actions on the inner ring of the fast action button. */
 internal enum class FastAction(val wireValue: String) {
-    Search("search"),
     Back("back"),
-    Forward("forward"),
-    Reload("reload"),
-    Tabs("tabs"),
-    NewTab("new_tab"),
     CloseTab("close_tab"),
-    Home("home"),
+    Search("search"),
+    NewTab("new_tab"),
+    Share("share"),
     ;
 
     companion object {
         fun fromWireValue(value: String?): FastAction? =
             entries.firstOrNull { action -> action.wireValue == value }
     }
-}
-
-/** Physical screen edge the button sits against; the action arc opens away from it. */
-internal enum class FastActionButtonEdge {
-    Start,
-    End,
 }
 
 internal data class FastActionOffset(
@@ -38,76 +29,106 @@ internal data class FastActionOffset(
 
 internal data class FastActionAvailability(
     val canGoBack: Boolean,
-    val canGoForward: Boolean,
     val canUsePageActions: Boolean,
     val canCloseTab: Boolean,
 )
 
+/** Recency input for the outer arc: a tab id and when it was last selected. */
+internal data class FastActionTabRecency(
+    val id: String,
+    val lastAccessedAt: Long,
+)
+
+/** What a press-and-slide gesture currently points at. */
+internal sealed interface FastActionTarget {
+    /** An entry of [FastActionButtonRules.InnerActions]. */
+    data class Inner(val index: Int) : FastActionTarget
+
+    /**
+     * An outer bubble: indices below the recent-tab count are recent tabs, and the last index is
+     * the tab overview.
+     */
+    data class Outer(val index: Int) : FastActionTarget
+}
+
 /**
- * Pure geometry and selection rules for the fast action button.
+ * Pure geometry and selection rules for the centred fast action button.
+ *
+ * The button sits at the bottom centre. Pressing it opens a half-disc with page actions on an
+ * inner ring and an outer arc of recent tabs ending in the tab overview.
  *
  * Angles use the mathematical convention (0 degrees points right, 90 degrees points up), while
  * offsets use screen coordinates (y grows downward), matching Compose layout space.
  */
 internal object FastActionButtonRules {
-    val DefaultActions: List<FastAction> = listOf(
+    /** Inner ring, from the left end of the half-disc to the right end in left-to-right layouts. */
+    val InnerActions: List<FastAction> = listOf(
         FastAction.Back,
-        FastAction.Search,
-        FastAction.Tabs,
-        FastAction.NewTab,
-        FastAction.Reload,
         FastAction.CloseTab,
+        FastAction.Search,
+        FastAction.NewTab,
+        FastAction.Share,
     )
 
-    /** Arc measured from straight up toward the open side of the screen. */
-    const val ARC_START_DEGREES = 80f
-    const val ARC_SWEEP_DEGREES = 110f
+    const val INNER_START_DEGREES = 180f
+    const val INNER_END_DEGREES = 0f
+    const val OUTER_START_DEGREES = 160f
+    const val OUTER_END_DEGREES = 20f
 
-    /** Fraction of the arc radius a drag must travel before an action is highlighted. */
-    const val ACTIVATION_RADIUS_FRACTION = 0.42f
+    /** Recent tabs shown on the outer arc, before the tab-overview bubble. */
+    const val MAX_RECENT_TABS = 3
 
-    /** Drags beyond this multiple of the arc radius cancel the selection. */
-    const val CANCEL_RADIUS_FRACTION = 2.2f
+    /** Fraction of the inner radius a drag must travel before anything is highlighted. */
+    const val ACTIVATION_RADIUS_FRACTION = 0.45f
+
+    /** Drags beyond this multiple of the outer radius cancel the selection. */
+    const val CANCEL_RADIUS_FRACTION = 1.45f
+
+    /** Angular tolerance as a fraction of the spacing between neighbouring items. */
+    const val ANGLE_TOLERANCE_FRACTION = 0.75f
 
     fun isEnabled(action: FastAction, availability: FastActionAvailability): Boolean =
         when (action) {
             FastAction.Back -> availability.canGoBack
-            FastAction.Forward -> availability.canGoForward
-            FastAction.Reload -> availability.canUsePageActions
             FastAction.CloseTab -> availability.canCloseTab
+            FastAction.Share -> availability.canUsePageActions
             FastAction.Search,
-            FastAction.Tabs,
             FastAction.NewTab,
-            FastAction.Home,
             -> true
         }
 
-    /** Angle in degrees for each item, spread evenly over the arc. */
-    fun itemAngles(count: Int, edge: FastActionButtonEdge): List<Float> {
+    /**
+     * Up to [max] most recently used tabs, ordered oldest to newest so the newest sits next to
+     * the tab-overview bubble at the end of the arc.
+     */
+    fun recentTabIds(tabs: List<FastActionTabRecency>, max: Int = MAX_RECENT_TABS): List<String> {
+        if (max <= 0) return emptyList()
+        return tabs
+            .sortedByDescending(FastActionTabRecency::lastAccessedAt)
+            .take(max)
+            .reversed()
+            .map(FastActionTabRecency::id)
+    }
+
+    /** Evenly spread angles from [start] to [end]; RTL mirrors them across the vertical axis. */
+    fun spreadAngles(count: Int, start: Float, end: Float, isRtl: Boolean): List<Float> {
         if (count <= 0) return emptyList()
-        val step = if (count == 1) 0f else ARC_SWEEP_DEGREES / (count - 1)
         return List(count) { index ->
-            val fromUp = if (count == 1) ARC_SWEEP_DEGREES / 2f else step * index
-            val angleOnEndEdge = ARC_START_DEGREES + fromUp
-            when (edge) {
-                // Button on the right: the arc opens up and to the left (80..190 degrees).
-                FastActionButtonEdge.End -> angleOnEndEdge
-                // Button on the left: mirror across the vertical axis.
-                FastActionButtonEdge.Start -> 180f - angleOnEndEdge
-            }
+            val degrees = if (count == 1) (start + end) / 2f else start + (end - start) * index / (count - 1)
+            if (isRtl) 180f - degrees else degrees
         }
     }
 
+    fun innerAngles(count: Int, isRtl: Boolean): List<Float> =
+        spreadAngles(count, INNER_START_DEGREES, INNER_END_DEGREES, isRtl)
+
+    fun outerAngles(count: Int, isRtl: Boolean): List<Float> =
+        spreadAngles(count, OUTER_START_DEGREES, OUTER_END_DEGREES, isRtl)
+
     /** Item centre offsets relative to the button centre, in screen coordinates. */
-    fun itemOffsets(
-        count: Int,
-        edge: FastActionButtonEdge,
-        radiusPx: Float,
-    ): List<FastActionOffset> {
-        if (radiusPx <= 0f || !radiusPx.isFinite()) return List(count.coerceAtLeast(0)) {
-            FastActionOffset(0f, 0f)
-        }
-        return itemAngles(count, edge).map { degrees ->
+    fun offsets(angles: List<Float>, radiusPx: Float): List<FastActionOffset> {
+        if (radiusPx <= 0f || !radiusPx.isFinite()) return angles.map { FastActionOffset(0f, 0f) }
+        return angles.map { degrees ->
             val radians = degrees * PI / 180.0
             FastActionOffset(
                 x = (cos(radians) * radiusPx).toFloat(),
@@ -117,42 +138,42 @@ internal object FastActionButtonRules {
     }
 
     /**
-     * Index of the action under a drag that started on the button, or null when the drag is too
-     * short, too far, or nearest to a disabled action.
+     * Target under a drag that started on the button, or null when the drag is too short, too
+     * far, off the half-disc, or nearest to a disabled inner action. The ring is chosen by
+     * distance, split halfway between the two radii; the item is the nearest by angle.
      */
-    fun selectedIndex(
+    fun selectedTarget(
         drag: FastActionOffset,
-        enabled: List<Boolean>,
-        edge: FastActionButtonEdge,
-        radiusPx: Float,
-    ): Int? {
-        if (enabled.isEmpty() || radiusPx <= 0f || !radiusPx.isFinite()) return null
+        innerEnabled: List<Boolean>,
+        outerCount: Int,
+        innerRadiusPx: Float,
+        outerRadiusPx: Float,
+        isRtl: Boolean,
+    ): FastActionTarget? {
+        if (!innerRadiusPx.isFinite() || !outerRadiusPx.isFinite()) return null
+        if (innerRadiusPx <= 0f || outerRadiusPx <= innerRadiusPx) return null
         if (!drag.x.isFinite() || !drag.y.isFinite()) return null
         val distance = hypot(drag.x, drag.y)
-        if (distance < radiusPx * ACTIVATION_RADIUS_FRACTION) return null
-        if (distance > radiusPx * CANCEL_RADIUS_FRACTION) return null
+        if (distance < innerRadiusPx * ACTIVATION_RADIUS_FRACTION) return null
+        if (distance > outerRadiusPx * CANCEL_RADIUS_FRACTION) return null
         val dragDegrees = normalizedDegrees(
             (atan2(-drag.y.toDouble(), drag.x.toDouble()) * 180.0 / PI).toFloat(),
         )
-        val angles = itemAngles(enabled.size, edge)
-        val nearest = angles.indices.minByOrNull { index ->
-            angularDistance(dragDegrees, angles[index])
-        } ?: return null
-        val step = if (angles.size == 1) ARC_SWEEP_DEGREES else ARC_SWEEP_DEGREES / (angles.size - 1)
-        // Reject drags more than one item step away from the nearest item.
-        if (angularDistance(dragDegrees, angles[nearest]) > step) return null
-        return nearest.takeIf { enabled[it] }
+        val bandSplit = (innerRadiusPx + outerRadiusPx) / 2f
+        return if (distance < bandSplit) {
+            val index = nearestIndex(dragDegrees, innerAngles(innerEnabled.size, isRtl)) ?: return null
+            if (innerEnabled[index]) FastActionTarget.Inner(index) else null
+        } else {
+            nearestIndex(dragDegrees, outerAngles(outerCount, isRtl))?.let(FastActionTarget::Outer)
+        }
     }
 
-    /** Edge the button should sit against for a horizontal centre within the container. */
-    fun edgeFor(centerX: Float, containerWidth: Float, isRtl: Boolean): FastActionButtonEdge {
-        if (containerWidth <= 0f || !centerX.isFinite()) {
-            return if (isRtl) FastActionButtonEdge.Start else FastActionButtonEdge.End
-        }
-        return if (centerX >= containerWidth / 2f) {
-            FastActionButtonEdge.End
-        } else {
-            FastActionButtonEdge.Start
+    private fun nearestIndex(degrees: Float, angles: List<Float>): Int? {
+        if (angles.isEmpty()) return null
+        val nearest = angles.indices.minBy { index -> angularDistance(degrees, angles[index]) }
+        val spacing = if (angles.size == 1) 90f else abs(angles[1] - angles[0])
+        return nearest.takeIf {
+            angularDistance(degrees, angles[nearest]) <= spacing * ANGLE_TOLERANCE_FRACTION
         }
     }
 
