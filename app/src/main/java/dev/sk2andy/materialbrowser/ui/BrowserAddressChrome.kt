@@ -681,18 +681,23 @@ internal fun BoxScope.BrowserAddressChrome(
         }
         FastActionButton(
             availability = FastActionAvailability(
-                canGoBack = selectedTab.canGoBack,
-                canUsePageActions = hasHttpPage,
+                canReload = selectedTab.url != BLANK_URL,
+                canShare = hasHttpPage,
                 canCloseTab = true,
             ),
             recentTabs = recentFastActionTabs,
             selectedTabId = selectedTab.id,
             favicons = controller.favicons,
             tabCount = controller.activeTabs.size,
+            isLoading = selectedTab.isLoading,
             bottomPadding = fastActionBottomPadding,
             onAction = { action ->
                 when (action) {
-                    FastAction.Back -> controller.goBack()
+                    FastAction.Reload -> if (selectedTab.isLoading) {
+                        controller.stopLoading()
+                    } else {
+                        controller.reload()
+                    }
                     FastAction.CloseTab -> controller.closeTabFromUser(selectedTab.id)
                     FastAction.Search -> openAddressEditor()
                     FastAction.NewTab -> openNewTabAndEdit()
