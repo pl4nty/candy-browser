@@ -56,6 +56,7 @@ internal object TabSettingsTestTags {
     const val ClosedTabUndo = "tab_settings_closed_tab_undo"
     const val AddressBarDocking = "tab_settings_address_bar_docking"
     const val AddressBarSwipeMode = "tab_settings_address_bar_swipe_mode"
+    const val FastActionButton = "tab_settings_fast_action_button"
     const val AddressBarLongPressAction = "tab_settings_address_bar_long_press_action"
     const val LinkLongPressAction = "tab_settings_link_long_press_action"
     const val LinkPeekSwipeAction = "tab_settings_link_peek_swipe_action"
@@ -87,6 +88,7 @@ internal fun TabsAndGesturesSettingsPage(
     profilesEnabled: Boolean,
     isAddressBarDockingEnabled: Boolean,
     isAddressBarSwipeModeEnabled: Boolean = false,
+    isFastActionButtonEnabled: Boolean = false,
     addressBarLongPressAction: AddressBarLongPressAction = AddressBarLongPressAction.Default,
     linkLongPressAction: LinkLongPressAction = LinkLongPressAction.LinkPeek,
     linkPeekSwipeAction: LinkPeekSwipeAction = LinkPeekSwipeAction.OpenBackground,
@@ -103,6 +105,7 @@ internal fun TabsAndGesturesSettingsPage(
     onProfilesEnabledChanged: (Boolean) -> Unit,
     onAddressBarDockingEnabledChanged: (Boolean) -> Unit,
     onAddressBarSwipeModeEnabledChanged: (Boolean) -> Unit = {},
+    onFastActionButtonEnabledChanged: (Boolean) -> Unit = {},
     onAddressBarLongPressActions: () -> Unit = {},
     onLinkLongPressActionChanged: (LinkLongPressAction) -> Unit = {},
     onLinkPeekSwipeActionChanged: (LinkPeekSwipeAction) -> Unit = {},
@@ -409,6 +412,14 @@ internal fun TabsAndGesturesSettingsPage(
                     checked = isAddressBarSwipeModeEnabled,
                     onCheckedChange = onAddressBarSwipeModeEnabledChanged,
                     modifier = Modifier.testTag(TabSettingsTestTags.AddressBarSwipeMode),
+                )
+                SettingsPreferenceDivider()
+                SettingsSwitch(
+                    title = stringResource(R.string.settings_fast_action_button_title),
+                    subtitle = stringResource(R.string.settings_fast_action_button_summary),
+                    checked = isFastActionButtonEnabled,
+                    onCheckedChange = onFastActionButtonEnabledChanged,
+                    modifier = Modifier.testTag(TabSettingsTestTags.FastActionButton),
                 )
                 SettingsPreferenceDivider()
                 TabDismissResistanceSettings(

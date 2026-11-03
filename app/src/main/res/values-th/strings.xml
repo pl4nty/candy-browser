@@ -589,6 +589,9 @@
     <string name="settings_address_bar_docking_title">ย้ายตัวเลขที่จอดอยู่</string>
     <string name="settings_address_bar_swipe_mode_title">สลับแถบที่อยู่ด้วยการปัด</string>
     <string name="settings_address_bar_swipe_mode_summary">ปัดลงบนหน้าเว็บเพื่อขยายแถบที่อยู่ และปัดขึ้นเพื่อย่อ แม้ว่าหน้าเว็บจะเลื่อนไม่ได้ เมื่อปิด แถบที่อยู่จะเปลี่ยนตามการเลื่อนหน้าเว็บ</string>
+    <string name="settings_fast_action_button_title">ปุ่มการทำงานด่วน</string>
+    <string name="settings_fast_action_button_summary">แสดงปุ่มลอย แตะเพื่อเปิดการทำงานด่วน หรือกดค้างแล้วเลื่อนไปยังการทำงานที่ต้องการ</string>
+    <string name="cd_fast_action_button">การทำงานด่วน</string>
     <string name="settings_address_bar_docking_subtitle">ดึงยาที่จอดไว้ และปล่อยให้มันขึ้นสูงใด ๆ เพื่อจับมันไปยังขอบหน้าจอที่ใกล้ที่สุด ปิดเพื่อให้บาร์ที่อยู่อยู่ตรงกลาง</string>
     <string name="settings_tab_dismiss_resistance">ความต้านทานการปลด Tab</string>
     <string name="settings_tab_dismiss_resistance_summary">ระยะความต้านทาน: %1$d%% ของระยะปิด</string>

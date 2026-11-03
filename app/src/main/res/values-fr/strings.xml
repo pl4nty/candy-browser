@@ -582,6 +582,9 @@
     <string name="settings_address_bar_docking_title">Déplacer la pilule d’adresse ancrée</string>
     <string name="settings_address_bar_swipe_mode_title">Changer la pilule d’adresse par balayage</string>
     <string name="settings_address_bar_swipe_mode_summary">Balayez la page vers le bas pour déployer la pilule et vers le haut pour la réduire, même si la page ne défile pas. Si désactivé, la pilule suit le défilement de la page.</string>
+    <string name="settings_fast_action_button_title">Bouton d’actions rapides</string>
+    <string name="settings_fast_action_button_summary">Affiche un bouton flottant. Touchez-le pour les actions rapides, ou appuyez et glissez vers une action.</string>
+    <string name="cd_fast_action_button">Actions rapides</string>
     <string name="settings_address_bar_docking_subtitle">Faites glisser la pilule ancrée et relâchez-la à la hauteur voulue pour la fixer au bord le plus proche. Désactivez cette option pour garder la barre centrée.</string>
     <string name="settings_tab_dismiss_resistance">Résistance à la fermeture des onglets</string>
     <string name="settings_tab_dismiss_resistance_summary">Phase de résistance : %1$d%% de la distance de fermeture</string>
