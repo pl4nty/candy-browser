@@ -673,33 +673,36 @@ internal fun BoxScope.BrowserAddressChrome(
             targetValue = targetBottomPadding,
             label = "fastActionBottomPadding",
         )
+        val recentFastActionTabs = remember(controller.activeTabs) {
+            val tabsById = controller.activeTabs.associateBy(BrowserTab::id)
+            FastActionButtonRules.recentTabIds(
+                controller.activeTabs.map { FastActionTabRecency(it.id, it.lastAccessedAt) },
+            ).mapNotNull(tabsById::get)
+        }
         FastActionButton(
-            actions = FastActionButtonRules.DefaultActions,
             availability = FastActionAvailability(
                 canGoBack = selectedTab.canGoBack,
-                canGoForward = selectedTab.canGoForward,
-                canUsePageActions = selectedTab.url != BLANK_URL,
+                canUsePageActions = hasHttpPage,
                 canCloseTab = true,
             ),
+            recentTabs = recentFastActionTabs,
+            selectedTabId = selectedTab.id,
+            favicons = controller.favicons,
             tabCount = controller.activeTabs.size,
-            isLoading = selectedTab.isLoading,
             bottomPadding = fastActionBottomPadding,
             onAction = { action ->
                 when (action) {
-                    FastAction.Search -> openAddressEditor()
                     FastAction.Back -> controller.goBack()
-                    FastAction.Forward -> controller.goForward()
-                    FastAction.Reload -> if (selectedTab.isLoading) {
-                        controller.stopLoading()
-                    } else {
-                        controller.reload()
-                    }
-                    FastAction.Tabs -> onTabs()
-                    FastAction.NewTab -> openNewTabAndEdit()
                     FastAction.CloseTab -> controller.closeTabFromUser(selectedTab.id)
-                    FastAction.Home -> controller.openNormalHome()
+                    FastAction.Search -> openAddressEditor()
+                    FastAction.NewTab -> openNewTabAndEdit()
+                    FastAction.Share -> controller.shareSelectedPage()
                 }
             },
+            onSelectTab = { tabId ->
+                if (tabId != selectedTab.id) controller.selectTab(tabId)
+            },
+            onTabs = onTabs,
         )
     }
 
