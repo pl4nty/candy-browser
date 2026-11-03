@@ -245,7 +245,7 @@ internal fun BoxScope.FastActionButton(
         highlighted?.let { target ->
             val text = when (target) {
                 is FastActionTarget.Inner -> stringResource(actions[target.index].labelRes())
-                is FastActionTarget.Outer -> recentTabs.getOrNull(target.index)?.let(::displayTabTitle)
+                is FastActionTarget.Outer -> recentTabs.getOrNull(target.index)?.let { displayTabTitle(it) }
                     ?: stringResource(R.string.address_bar_action_tabs)
             }
             Surface(
