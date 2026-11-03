@@ -174,22 +174,22 @@ class FastActionButtonRulesTest {
     }
 
     @Test
-    fun `replacing the address bar trades the oldest tab for the menu at the left end`() {
+    fun `replacing the address bar puts the current tab left, oldest in the middle and the menu right`() {
         val items = FastActionButtonRules.outerItems(listOf("a", "b", "c", "d"), includeMenu = true)
         assertEquals(
             listOf(
-                FastActionOuterItem.Menu,
-                FastActionOuterItem.Tab("b"),
-                FastActionOuterItem.Tab("c"),
                 FastActionOuterItem.Tab("d"),
+                FastActionOuterItem.Tab("c"),
+                FastActionOuterItem.Tab("b"),
                 FastActionOuterItem.Overview,
+                FastActionOuterItem.Menu,
             ),
             items,
         )
         assertEquals(outerCount, items.size)
         assertEquals(3, FastActionButtonRules.maxRecentTabs(includeMenu = true))
         assertEquals(
-            listOf(FastActionOuterItem.Menu, FastActionOuterItem.Tab("a"), FastActionOuterItem.Overview),
+            listOf(FastActionOuterItem.Tab("a"), FastActionOuterItem.Overview, FastActionOuterItem.Menu),
             FastActionButtonRules.outerItems(listOf("a"), includeMenu = true),
         )
     }
