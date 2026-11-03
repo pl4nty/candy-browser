@@ -30,7 +30,7 @@ class FastActionButtonRulesTest {
     @Test
     fun `inner ring follows the opera gx order`() {
         assertEquals(
-            listOf(FastAction.Back, FastAction.CloseTab, FastAction.Search, FastAction.NewTab, FastAction.Share),
+            listOf(FastAction.Reload, FastAction.CloseTab, FastAction.Search, FastAction.NewTab, FastAction.Share),
             FastActionButtonRules.InnerActions,
         )
     }
@@ -43,16 +43,16 @@ class FastActionButtonRulesTest {
     }
 
     @Test
-    fun `availability gates back, close and share only`() {
-        val none = FastActionAvailability(canGoBack = false, canUsePageActions = false, canCloseTab = false)
-        assertFalse(FastActionButtonRules.isEnabled(FastAction.Back, none))
+    fun `availability gates reload, close and share only`() {
+        val none = FastActionAvailability(canReload = false, canShare = false, canCloseTab = false)
+        assertFalse(FastActionButtonRules.isEnabled(FastAction.Reload, none))
         assertFalse(FastActionButtonRules.isEnabled(FastAction.CloseTab, none))
         assertFalse(FastActionButtonRules.isEnabled(FastAction.Share, none))
         assertTrue(FastActionButtonRules.isEnabled(FastAction.Search, none))
         assertTrue(FastActionButtonRules.isEnabled(FastAction.NewTab, none))
-        assertTrue(FastActionButtonRules.isEnabled(FastAction.Back, none.copy(canGoBack = true)))
+        assertTrue(FastActionButtonRules.isEnabled(FastAction.Reload, none.copy(canReload = true)))
         assertTrue(FastActionButtonRules.isEnabled(FastAction.CloseTab, none.copy(canCloseTab = true)))
-        assertTrue(FastActionButtonRules.isEnabled(FastAction.Share, none.copy(canUsePageActions = true)))
+        assertTrue(FastActionButtonRules.isEnabled(FastAction.Share, none.copy(canShare = true)))
     }
 
     @Test
@@ -62,10 +62,9 @@ class FastActionButtonRulesTest {
     }
 
     @Test
-    fun `outer arc spreads recent tabs then overview between 160 and 20 degrees`() {
-        val angles = FastActionButtonRules.outerAngles(4, isRtl = false)
-        assertEquals(160f, angles.first(), 0.001f)
-        assertEquals(20f, angles.last(), 0.001f)
+    fun `outer arc spreads four recent tabs then overview evenly between 160 and 20 degrees`() {
+        val angles = FastActionButtonRules.outerAngles(outerCount, isRtl = false)
+        assertEquals(listOf(160f, 125f, 90f, 55f, 20f), angles)
         assertTrue(angles.zipWithNext().all { (a, b) -> a > b })
         assertEquals(listOf(90f), FastActionButtonRules.outerAngles(1, isRtl = false))
         assertEquals(emptyList<Float>(), FastActionButtonRules.outerAngles(0, isRtl = false))
@@ -122,7 +121,7 @@ class FastActionButtonRulesTest {
     }
 
     @Test
-    fun `back and share tolerate a slightly downward drag but not straight down`() {
+    fun `reload and share tolerate a slightly downward drag but not straight down`() {
         assertEquals(FastActionTarget.Inner(0), select(toward(195.0, inner)))
         assertEquals(FastActionTarget.Inner(4), select(toward(-15.0, inner)))
         assertNull(select(toward(270.0, inner)))
@@ -149,7 +148,8 @@ class FastActionButtonRulesTest {
             FastActionTabRecency("c", 30),
             FastActionTabRecency("d", 20),
         )
-        assertEquals(listOf("d", "c", "b"), FastActionButtonRules.recentTabIds(tabs))
+        assertEquals(listOf("a", "d", "c", "b"), FastActionButtonRules.recentTabIds(tabs))
+        assertEquals(listOf("c", "b"), FastActionButtonRules.recentTabIds(tabs, max = 2))
         assertEquals(listOf("b"), FastActionButtonRules.recentTabIds(tabs, max = 1))
         assertEquals(emptyList<String>(), FastActionButtonRules.recentTabIds(tabs, max = 0))
         assertEquals(listOf("a"), FastActionButtonRules.recentTabIds(tabs.take(1)))

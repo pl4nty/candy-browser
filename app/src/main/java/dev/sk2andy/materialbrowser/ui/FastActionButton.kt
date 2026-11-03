@@ -4,7 +4,9 @@ import android.graphics.Bitmap
 import android.view.HapticFeedbackConstants
 import androidx.annotation.StringRes
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -75,7 +77,8 @@ private val InnerItemSize = 44.dp
 private val OuterItemSize = 56.dp
 private val InnerRadius = 84.dp
 private val OuterRadius = 150.dp
-private val DiscRadius = 124.dp
+// The disc edge runs through the centres of the outer bubbles, as in Opera GX.
+private val DiscRadius = OuterRadius
 
 /**
  * Centred floating button modelled on Opera GX's fast action button. A tap toggles a half-disc
@@ -91,6 +94,7 @@ internal fun BoxScope.FastActionButton(
     selectedTabId: String,
     favicons: Map<String, Bitmap>,
     tabCount: Int,
+    isLoading: Boolean,
     bottomPadding: Dp,
     onAction: (FastAction) -> Unit,
     onSelectTab: (String) -> Unit,
@@ -116,6 +120,12 @@ internal fun BoxScope.FastActionButton(
     val progress by animateFloatAsState(
         targetValue = if (expanded) 1f else 0f,
         animationSpec = spring(dampingRatio = 0.75f, stiffness = 700f),
+        label = "fastActionItems",
+    )
+    // The disc grows out of the button while it is held, ahead of the items.
+    val discProgress by animateFloatAsState(
+        targetValue = if (expanded) 1f else 0f,
+        animationSpec = tween(durationMillis = 240, easing = FastOutSlowInEasing),
         label = "fastActionDisc",
     )
     val currentInnerEnabled by rememberUpdatedState(innerEnabled)
@@ -150,7 +160,7 @@ internal fun BoxScope.FastActionButton(
             IntOffset((offset.x * progress).roundToInt(), (offset.y * progress).roundToInt())
         }
 
-    if (expanded || progress > 0.01f) {
+    if (expanded || progress > 0.01f || discProgress > 0.01f) {
         Box(
             modifier = Modifier
                 .fillMaxSize()
@@ -173,10 +183,11 @@ internal fun BoxScope.FastActionButton(
                 .zIndex(29.5f)
                 .requiredSize(DiscRadius * 2)
                 .graphicsLayer {
-                    val scale = 0.4f + 0.6f * progress.coerceIn(0f, 1f)
+                    val grow = discProgress.coerceIn(0f, 1f)
+                    val scale = ButtonSize.toPx() / DiscRadius.toPx() / 2f * (1f - grow) + grow
                     scaleX = scale
                     scaleY = scale
-                    alpha = progress.coerceIn(0f, 1f)
+                    alpha = 0.5f + 0.5f * grow
                 }
                 .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.95f), CircleShape),
         )
@@ -205,7 +216,7 @@ internal fun BoxScope.FastActionButton(
                         MaterialTheme.colorScheme.onPrimaryContainer
                     },
                 ) {
-                    FastActionGlyph(action = action, enabled = innerEnabled[index])
+                    FastActionGlyph(action = action, enabled = innerEnabled[index], isLoading = isLoading)
                 }
             }
         }
@@ -284,6 +295,13 @@ internal fun BoxScope.FastActionButton(
             .pointerInput(isRtl, innerRadiusPx, outerRadiusPx) {
                 awaitEachGesture {
                     val down = awaitFirstDown()
+                    // Pressing opens the disc straight away so it can grow while held.
+                    val openedByPress = !expanded
+                    if (openedByPress) {
+                        expanded = true
+                        highlighted = null
+                        view.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
+                    }
                     var dragging = false
                     var total = Offset.Zero
                     while (true) {
@@ -293,17 +311,15 @@ internal fun BoxScope.FastActionButton(
                             change.consume()
                             if (dragging) {
                                 highlighted?.let(::run) ?: close()
-                            } else {
-                                expanded = !expanded
-                                highlighted = null
-                                view.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
+                            } else if (!openedByPress) {
+                                // A tap on an open disc closes it; a tap that opened it keeps it open.
+                                close()
                             }
                             break
                         }
                         total += change.positionChange()
                         if (!dragging && total.getDistance() > viewConfiguration.touchSlop) {
                             dragging = true
-                            expanded = true
                         }
                         if (dragging) {
                             change.consume()
@@ -338,10 +354,14 @@ internal fun BoxScope.FastActionButton(
 }
 
 @Composable
-private fun FastActionGlyph(action: FastAction, enabled: Boolean) {
+private fun FastActionGlyph(action: FastAction, enabled: Boolean, isLoading: Boolean) {
     val tint = LocalContentColor.current.let { if (enabled) it else it.copy(alpha = 0.38f) }
     when (action) {
-        FastAction.Back -> Icon(painterResource(R.drawable.ic_symbol_arrow_back), null, tint = tint)
+        FastAction.Reload -> Icon(
+            painterResource(if (isLoading) R.drawable.ic_symbol_close else R.drawable.ic_symbol_refresh),
+            null,
+            tint = tint,
+        )
         FastAction.CloseTab -> Icon(Icons.Default.Close, null, tint = tint)
         FastAction.Search -> Icon(Icons.Default.Search, null, tint = tint)
         FastAction.NewTab -> Icon(Icons.Default.Add, null, tint = tint)
@@ -351,7 +371,7 @@ private fun FastActionGlyph(action: FastAction, enabled: Boolean) {
 
 @StringRes
 internal fun FastAction.labelRes(): Int = when (this) {
-    FastAction.Back -> R.string.action_back
+    FastAction.Reload -> R.string.action_reload
     FastAction.CloseTab -> R.string.cd_close_tab
     FastAction.Search -> R.string.settings_section_search
     FastAction.NewTab -> R.string.cd_new_tab
