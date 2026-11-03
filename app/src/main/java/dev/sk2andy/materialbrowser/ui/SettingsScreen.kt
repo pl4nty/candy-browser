@@ -118,6 +118,7 @@ internal fun SettingsScreen(
     statusBarScrollTargetWidthPercent: Int = StatusBarScrollRules.DEFAULT_TARGET_WIDTH_PERCENT,
     isAddressBarDockingEnabled: Boolean,
     isAddressBarSwipeModeEnabled: Boolean = false,
+    isFastActionButtonEnabled: Boolean = false,
     isExternalLinkPreviewEnabled: Boolean = false,
     externalLinkPreviewProfileId: String? = null,
     externalLinkPreviewProfiles: List<BrowserProfile> = emptyList(),
@@ -203,6 +204,7 @@ internal fun SettingsScreen(
     onOpenStatusBarScrollAccessibilitySettings: () -> Unit = {},
     onAddressBarDockingEnabledChanged: (Boolean) -> Unit,
     onAddressBarSwipeModeEnabledChanged: (Boolean) -> Unit = {},
+    onFastActionButtonEnabledChanged: (Boolean) -> Unit = {},
     onExternalLinkPreviewEnabledChanged: (Boolean) -> Unit = {},
     onExternalLinkPreviewProfileChanged: (String?) -> Unit = {},
     onExternalAppLinkHandlingChanged: (ExternalAppLinkHandling) -> Unit = {},
@@ -387,6 +389,7 @@ internal fun SettingsScreen(
                     profilesEnabled = profilesEnabled,
                     isAddressBarDockingEnabled = isAddressBarDockingEnabled,
                     isAddressBarSwipeModeEnabled = isAddressBarSwipeModeEnabled,
+                    isFastActionButtonEnabled = isFastActionButtonEnabled,
                     addressBarLongPressAction = addressBarLongPressAction,
                     linkLongPressAction = linkLongPressAction,
                     linkPeekSwipeAction = linkPeekSwipeAction,
@@ -404,6 +407,7 @@ internal fun SettingsScreen(
                     onProfilesEnabledChanged = onProfilesEnabledChanged,
                     onAddressBarDockingEnabledChanged = onAddressBarDockingEnabledChanged,
                     onAddressBarSwipeModeEnabledChanged = onAddressBarSwipeModeEnabledChanged,
+                    onFastActionButtonEnabledChanged = onFastActionButtonEnabledChanged,
                     onAddressBarLongPressActions = {
                         onDestinationChanged(SettingsDestination.AddressBarLongPressActions)
                     },
