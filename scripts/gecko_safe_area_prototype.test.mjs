@@ -3780,3 +3780,28 @@ test('scrolling pages and long scroll-locked pages keep the scrollable body inse
   modal.event('scroll');
   assert.deepEqual(modal.fallbacks, [], 'A long page behind a scroll-locking modal stays edge-to-edge');
 });
+
+test('a scroll-locked page that scrolled before its scroll listener ran switches to native insets at load', () => {
+  // Facebook reels scroll once during load and then never again, so no later scroll event
+  // reports the hidden body-inset scroll range.
+  const f = fixture({ themeColor: '#000000', userCssBridge: true });
+  f.context.document.documentElement.computed.overflowY = 'hidden';
+  f.context.document.documentElement.scrollHeight = 832;
+  f.start();
+  assert.deepEqual(f.fallbacks, []);
+  f.scrollTo(30);
+  f.event('load', 'window');
+  f.flush();
+  assert.deepEqual(f.fallbacks, [[1, 1, '#000000', true]]);
+});
+
+test('body protection rechecks keep long scroll-locked pages edge-to-edge', () => {
+  const f = fixture({ userCssBridge: true });
+  f.context.document.documentElement.computed.overflowY = 'hidden';
+  f.context.document.documentElement.scrollHeight = 4000;
+  f.start();
+  f.scrollTo(30);
+  f.event('load', 'window');
+  f.flush();
+  assert.deepEqual(f.fallbacks, []);
+});
