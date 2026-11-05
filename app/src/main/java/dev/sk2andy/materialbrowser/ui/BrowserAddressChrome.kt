@@ -329,6 +329,8 @@ internal fun BoxScope.BrowserAddressChrome(
         ),
         dockTargetEdge = controller.lastAddressBarDockEdge,
         editing = addressEditorVisible,
+        // The pill was hidden, so the editor opens without the resting actions fading out.
+        editorStartsFullWidth = fastActionReplacesBar,
         addressBarStyle = controller.appearanceSettings.addressBarStyle,
         addressLoadStyle = controller.appearanceSettings.addressLoadStyle,
         actionLayout = controller.addressBarActionLayout,
