@@ -252,16 +252,22 @@ jobs:
             app/src/main/assets/uassets_cosmetic_rules.txt \
             app/src/main/assets/uassets_procedural_cosmetic_rules.txt \
             app/src/main/assets/uassets_filters_source.txt
-          ./gradlew --no-daemon --parallel \
-            "-Dorg.gradle.jvmargs=-Xmx6g -Dfile.encoding=UTF-8" \
-            "-Pkotlin.daemon.jvmargs=-Xmx8g" \
+          ./gradlew --no-daemon --max-workers=1 \
             -Pcandy.releaseNotesFile="$INPUT_CHANGELOG" \
             testFullDebugUnitTest \
             testFossDebugUnitTest \
-            testSystemwebviewDebugUnitTest \
-            assembleFullRelease \
-            assembleFossRelease \
-            assembleSystemwebviewRelease \
+            testSystemwebviewDebugUnitTest
+          ./gradlew --no-daemon --max-workers=1 \
+            -Pcandy.releaseNotesFile="$INPUT_CHANGELOG" \
+            assembleFullRelease
+          ./gradlew --no-daemon --max-workers=1 \
+            -Pcandy.releaseNotesFile="$INPUT_CHANGELOG" \
+            assembleFossRelease
+          ./gradlew --no-daemon --max-workers=1 \
+            -Pcandy.releaseNotesFile="$INPUT_CHANGELOG" \
+            assembleSystemwebviewRelease
+          ./gradlew --no-daemon --max-workers=1 \
+            -Pcandy.releaseNotesFile="$INPUT_CHANGELOG" \
             assembleFullUserCaRelease
           CANDY_STANDARD_APK="app/build/outputs/apk/full/release/app-full-release.apk" \
             CANDY_FOSS_APK="app/build/outputs/apk/foss/release/app-foss-release.apk" \
@@ -285,9 +291,7 @@ jobs:
           cp \
             "app/build/outputs/apk/systemwebview/release/app-systemwebview-release.apk" \
             "$RUNNER_TEMP/candy-systemwebview-release.apk"
-          ./gradlew --no-daemon --parallel \
-            "-Dorg.gradle.jvmargs=-Xmx6g -Dfile.encoding=UTF-8" \
-            "-Pkotlin.daemon.jvmargs=-Xmx8g" \
+          ./gradlew --no-daemon --max-workers=1 \
             -Pcandy.releaseNotesFile="$INPUT_CHANGELOG" \
             -Pcandy.releaseAbi=arm64-v8a \
             -Pcandy.compressNativeLibs=true \

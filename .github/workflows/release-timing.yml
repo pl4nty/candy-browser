@@ -11,19 +11,23 @@ permissions:
 
 jobs:
   build:
-    name: Build on ${{ matrix.runner }}
+    name: ${{ matrix.mode.name }} on ${{ matrix.runner }}
     strategy:
       fail-fast: false
       matrix:
         runner:
-          - ubuntu-latest
           - nscloud-ubuntu-24.04-amd64-8x16
           - nscloud-ubuntu-24.04-amd64-16x32
-          - namespace-profile-cached
+        mode:
+          - name: serial
+            flags: --max-workers=1
+          - name: two-workers
+            flags: --max-workers=2 -Dorg.gradle.jvmargs=-Xmx4g -Pkotlin.daemon.jvmargs=-Xmx8g
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 90
     env:
       INPUT_CHANGELOG: release-notes/0.47.0.md
+      GRADLE_FLAGS: ${{ matrix.mode.flags }}
     steps:
       - name: Check out source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -107,16 +111,22 @@ jobs:
             app/src/main/assets/uassets_cosmetic_rules.txt \
             app/src/main/assets/uassets_procedural_cosmetic_rules.txt \
             app/src/main/assets/uassets_filters_source.txt
-          ./gradlew --no-daemon --parallel \
-            "-Dorg.gradle.jvmargs=-Xmx6g -Dfile.encoding=UTF-8" \
-            "-Pkotlin.daemon.jvmargs=-Xmx8g" \
+          ./gradlew --no-daemon $GRADLE_FLAGS \
             -Pcandy.releaseNotesFile="$INPUT_CHANGELOG" \
             testFullDebugUnitTest \
             testFossDebugUnitTest \
-            testSystemwebviewDebugUnitTest \
-            assembleFullRelease \
-            assembleFossRelease \
-            assembleSystemwebviewRelease \
+            testSystemwebviewDebugUnitTest
+          ./gradlew --no-daemon $GRADLE_FLAGS \
+            -Pcandy.releaseNotesFile="$INPUT_CHANGELOG" \
+            assembleFullRelease
+          ./gradlew --no-daemon $GRADLE_FLAGS \
+            -Pcandy.releaseNotesFile="$INPUT_CHANGELOG" \
+            assembleFossRelease
+          ./gradlew --no-daemon $GRADLE_FLAGS \
+            -Pcandy.releaseNotesFile="$INPUT_CHANGELOG" \
+            assembleSystemwebviewRelease
+          ./gradlew --no-daemon $GRADLE_FLAGS \
+            -Pcandy.releaseNotesFile="$INPUT_CHANGELOG" \
             assembleFullUserCaRelease
           CANDY_STANDARD_APK="app/build/outputs/apk/full/release/app-full-release.apk" \
             CANDY_FOSS_APK="app/build/outputs/apk/foss/release/app-foss-release.apk" \
@@ -140,9 +150,7 @@ jobs:
           cp \
             "app/build/outputs/apk/systemwebview/release/app-systemwebview-release.apk" \
             "$RUNNER_TEMP/candy-systemwebview-release.apk"
-          ./gradlew --no-daemon --parallel \
-            "-Dorg.gradle.jvmargs=-Xmx6g -Dfile.encoding=UTF-8" \
-            "-Pkotlin.daemon.jvmargs=-Xmx8g" \
+          ./gradlew --no-daemon $GRADLE_FLAGS \
             -Pcandy.releaseNotesFile="$INPUT_CHANGELOG" \
             -Pcandy.releaseAbi=arm64-v8a \
             -Pcandy.compressNativeLibs=true \
