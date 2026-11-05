@@ -1656,6 +1656,13 @@
   }
 
   function verifyBodyProtection() {
+    // Facebook scrolls during load, often before the body inset and its scroll lock are in
+    // place, and then never scrolls again. Recheck on each body protection pass (including
+    // window load and body resizes), not only on scroll events.
+    if (scrollRevealsOnlyBodyInset()) {
+      requestNativeFallbackForScrollLock();
+      return;
+    }
     if (!configuration?.active || configuration.cover || document.hidden || !document.body || protectedBody !== document.body ||
         typeof globalThis.CandyContentTopInset?.protectBodyWithUserCss !== "function") return;
     const entry = rules.get(document.body);
