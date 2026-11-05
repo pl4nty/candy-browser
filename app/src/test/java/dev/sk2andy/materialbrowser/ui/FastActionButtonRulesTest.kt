@@ -3,6 +3,7 @@ package dev.sk2andy.materialbrowser.ui
 import kotlin.math.cos
 import kotlin.math.hypot
 import kotlin.math.sin
+import kotlin.math.sqrt
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -192,5 +193,23 @@ class FastActionButtonRulesTest {
             listOf(FastActionOuterItem.Tab("a"), FastActionOuterItem.Overview, FastActionOuterItem.Menu),
             FastActionButtonRules.outerItems(listOf("a"), includeMenu = true),
         )
+    }
+
+    @Test
+    fun `hold to open and the open animation take 70 percent of their original time`() {
+        assertEquals(280L, FastActionButtonRules.holdToOpenMillis(400L))
+        assertEquals(700L, FastActionButtonRules.holdToOpenMillis(1_000L))
+        assertEquals(168, FastActionButtonRules.DISC_GROW_MILLIS)
+        val settleRatio = sqrt(700f / FastActionButtonRules.ITEM_SPRING_STIFFNESS)
+        assertEquals(0.7f, settleRatio, 0.01f)
+    }
+
+    @Test
+    fun `only new tab skips the button's own confirm vibration`() {
+        val newTab = FastActionButtonRules.InnerActions.indexOf(FastAction.NewTab)
+        FastActionButtonRules.InnerActions.indices.forEach { index ->
+            assertEquals(index != newTab, FastActionButtonRules.confirmsWithHaptic(FastActionTarget.Inner(index)))
+        }
+        assertTrue(FastActionButtonRules.confirmsWithHaptic(FastActionTarget.Outer(0)))
     }
 }

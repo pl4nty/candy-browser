@@ -600,9 +600,7 @@
     <string name="settings_address_bar_swipe_mode_title">Превключване на адресната лента с плъзгане</string>
     <string name="settings_address_bar_swipe_mode_summary">Плъзнете надолу по страницата, за да разгънете лентата, и нагоре, за да я свиете, дори ако страницата не може да се превърта. Когато е изключено, лентата следва превъртането на страницата.</string>
     <string name="settings_fast_action_button_title">Бутон за бързи действия</string>
-    <string name="settings_fast_action_button_summary">Показва плаващ бутон. Докоснете го за бързи действия или натиснете и плъзнете към действие.</string>
-    <string name="settings_fast_action_button_replaces_address_bar_title">Замяна на адресната лента</string>
-    <string name="settings_fast_action_button_replaces_address_bar_summary">Скрива адресната лента. Докоснете бутона, за да редактирате адреса, или задръжте и плъзнете за действия, скорошни раздели и менюто.</string>
+    <string name="settings_fast_action_button_summary">Скрива адресната лента. Докоснете бутона, за да редактирате адреса, или задръжте и плъзнете за действия, скорошни раздели и менюто.</string>
     <string name="cd_fast_action_button">Бързи действия</string>
     <string name="settings_address_bar_docking_subtitle">Издърпайте паркираното хапче и го пуснете на всякаква височина, за да го приберете до най-близкия ръб на екрана. Изключете, за да запазите адресната лента в центъра.</string>
     <string name="settings_tab_dismiss_resistance">Съпротивление при затваряне на раздел</string>

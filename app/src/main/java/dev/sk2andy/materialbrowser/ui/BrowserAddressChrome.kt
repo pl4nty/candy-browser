@@ -222,10 +222,9 @@ internal fun BoxScope.BrowserAddressChrome(
         }
     }
 
-    // Option B of the fast action button: it stands in for the address pill, which only appears
-    // while editing, in the tab overview, for command feedback, or to host its main menu.
-    val fastActionReplacesBar = controller.isFastActionButtonEnabled &&
-        controller.isFastActionButtonReplacingAddressBar
+    // The fast action button stands in for the address pill, which only appears while editing,
+    // in the tab overview, for command feedback, or to host its main menu.
+    val fastActionReplacesBar = controller.isFastActionButtonEnabled
     var fastActionMenuRequestId by remember { mutableIntStateOf(0) }
     var fastActionMenuPending by remember { mutableStateOf(false) }
     var addressBarMenuOpen by remember { mutableStateOf(false) }
@@ -329,6 +328,8 @@ internal fun BoxScope.BrowserAddressChrome(
         ),
         dockTargetEdge = controller.lastAddressBarDockEdge,
         editing = addressEditorVisible,
+        // The pill was hidden, so the editor opens without the resting actions fading out.
+        editorStartsFullWidth = fastActionReplacesBar,
         addressBarStyle = controller.appearanceSettings.addressBarStyle,
         addressLoadStyle = controller.appearanceSettings.addressLoadStyle,
         actionLayout = controller.addressBarActionLayout,
@@ -702,11 +703,11 @@ internal fun BoxScope.BrowserAddressChrome(
             targetValue = targetBottomPadding,
             label = "fastActionBottomPadding",
         )
-        val recentFastActionTabs = remember(controller.activeTabs, fastActionReplacesBar) {
+        val recentFastActionTabs = remember(controller.activeTabs) {
             val tabsById = controller.activeTabs.associateBy(BrowserTab::id)
             FastActionButtonRules.recentTabIds(
                 controller.activeTabs.map { FastActionTabRecency(it.id, it.lastAccessedAt) },
-                max = FastActionButtonRules.maxRecentTabs(includeMenu = fastActionReplacesBar),
+                max = FastActionButtonRules.maxRecentTabs(includeMenu = true),
             ).mapNotNull(tabsById::get)
         }
         FastActionButton(
@@ -738,12 +739,16 @@ internal fun BoxScope.BrowserAddressChrome(
                 if (tabId != selectedTab.id) controller.selectTab(tabId)
             },
             onTabs = onTabs,
-            showMenu = fastActionReplacesBar,
+            showMenu = true,
             onMenu = {
                 fastActionMenuRequestId += 1
                 fastActionMenuPending = true
             },
-            onTap = if (fastActionReplacesBar) openAddressEditor else null,
+            onTap = openAddressEditor,
+            progressPercent = selectedTab.progress,
+            loadStyle = controller.appearanceSettings.addressLoadStyle,
+            // Hides while scrolling down, as the address pill collapses, and returns on scroll up.
+            hidden = controller.isBottomBarCompact,
         )
     }
 

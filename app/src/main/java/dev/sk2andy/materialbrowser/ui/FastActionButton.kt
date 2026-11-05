@@ -9,7 +9,6 @@ import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
@@ -63,6 +62,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import dev.sk2andy.materialbrowser.R
 import dev.sk2andy.materialbrowser.browser.BrowserTab
+import dev.sk2andy.materialbrowser.data.BrowserAddressLoadStyle
 import kotlin.math.roundToInt
 
 internal object FastActionButtonTestTags {
@@ -75,6 +75,8 @@ internal object FastActionButtonTestTags {
 }
 
 private val ButtonSize = 56.dp
+// The launcher art fills about 57% of its square, so this draws a logo about 24 dp across.
+private val LogoSize = 42.dp
 private val InnerItemSize = 44.dp
 private val OuterItemSize = 56.dp
 private val InnerRadius = 84.dp
@@ -91,6 +93,8 @@ private val DiscRadius = OuterRadius
  * @param showMenu adds the main-menu bubble at the start of the outer arc, in place of one tab.
  * @param onTap when set, a quick tap runs it instead of opening the disc, and the disc opens on
  * hold or slide. Used when the button replaces the address bar, so a tap edits the address.
+ * @param progressPercent page load progress, drawn as the address pill's load outline on the button.
+ * @param hidden hides the resting button, as the address pill collapses while scrolling down.
  */
 @Composable
 internal fun BoxScope.FastActionButton(
@@ -108,6 +112,9 @@ internal fun BoxScope.FastActionButton(
     showMenu: Boolean = false,
     onMenu: () -> Unit = {},
     onTap: (() -> Unit)? = null,
+    progressPercent: Int = 0,
+    loadStyle: BrowserAddressLoadStyle = BrowserAddressLoadStyle.Rainbow,
+    hidden: Boolean = false,
 ) {
     val view = LocalView.current
     val density = LocalDensity.current
@@ -129,15 +136,20 @@ internal fun BoxScope.FastActionButton(
     }
     var expanded by remember { mutableStateOf(false) }
     var highlighted by remember { mutableStateOf<FastActionTarget?>(null) }
+    val restingVisibility by animateFloatAsState(
+        targetValue = if (hidden && !expanded) 0f else 1f,
+        animationSpec = tween(durationMillis = 200, easing = FastOutSlowInEasing),
+        label = "fastActionResting",
+    )
     val progress by animateFloatAsState(
         targetValue = if (expanded) 1f else 0f,
-        animationSpec = spring(dampingRatio = 0.75f, stiffness = 700f),
+        animationSpec = spring(dampingRatio = 0.75f, stiffness = FastActionButtonRules.ITEM_SPRING_STIFFNESS),
         label = "fastActionItems",
     )
     // The disc grows out of the button while it is held, ahead of the items.
     val discProgress by animateFloatAsState(
         targetValue = if (expanded) 1f else 0f,
-        animationSpec = tween(durationMillis = 240, easing = FastOutSlowInEasing),
+        animationSpec = tween(durationMillis = FastActionButtonRules.DISC_GROW_MILLIS, easing = FastOutSlowInEasing),
         label = "fastActionDisc",
     )
     val currentInnerEnabled by rememberUpdatedState(innerEnabled)
@@ -156,7 +168,7 @@ internal fun BoxScope.FastActionButton(
 
     fun run(target: FastActionTarget) {
         close()
-        view.performConfirmHaptic()
+        if (FastActionButtonRules.confirmsWithHaptic(target)) view.performConfirmHaptic()
         when (target) {
             is FastActionTarget.Inner -> currentOnAction(actions[target.index])
             is FastActionTarget.Outer -> when (val item = currentOuterItems.getOrNull(target.index)) {
@@ -305,6 +317,8 @@ internal fun BoxScope.FastActionButton(
     }
 
     val buttonDescription = stringResource(R.string.cd_fast_action_button)
+    // Scrolling down hides the resting button entirely; it is not composed, so it takes no touches.
+    if (restingVisibility <= 0.01f) return
     Surface(
         shape = CircleShape,
         color = MaterialTheme.colorScheme.primaryContainer,
@@ -314,6 +328,10 @@ internal fun BoxScope.FastActionButton(
             .align(Alignment.BottomCenter)
             .padding(bottom = bottomPadding)
             .zIndex(32f)
+            .graphicsLayer {
+                alpha = restingVisibility
+                translationY = (1f - restingVisibility) * (ButtonSize.toPx() + bottomPadding.toPx())
+            }
             .size(ButtonSize)
             .testTag(FastActionButtonTestTags.Button)
             .semantics { contentDescription = buttonDescription }
@@ -326,7 +344,9 @@ internal fun BoxScope.FastActionButton(
                     val tap = currentOnTap
                     if (openedByPress && tap != null) {
                         // A quick tap runs onTap; holding or sliding opens the disc instead.
-                        val outcome = withTimeoutOrNull(viewConfiguration.longPressTimeoutMillis) {
+                        val outcome = withTimeoutOrNull(
+                            FastActionButtonRules.holdToOpenMillis(viewConfiguration.longPressTimeoutMillis),
+                        ) {
                             var result = PressOutcome.Cancelled
                             while (true) {
                                 val change = awaitPointerEvent().changes.firstOrNull { it.id == down.id } ?: break
@@ -400,11 +420,21 @@ internal fun BoxScope.FastActionButton(
             },
     ) {
         Box(contentAlignment = Alignment.Center) {
-            // GX-style ring glyph.
-            Box(
-                modifier = Modifier
-                    .size(22.dp)
-                    .border(2.dp, LocalContentColor.current, CircleShape),
+            // Candy's logo as a monochrome mark: its launcher art tinted to the content colour.
+            Icon(
+                painter = painterResource(R.drawable.ic_launcher_foreground_art),
+                contentDescription = null,
+                modifier = Modifier.size(LogoSize),
+            )
+            // The address pill's load outline, traced inside the button's edge.
+            AddressLoadCapsuleFeedback(
+                tabId = selectedTabId,
+                isLoading = isLoading,
+                progressPercent = progressPercent,
+                style = loadStyle,
+                morphProgress = 0f,
+                morphTargetSizePx = with(density) { ButtonSize.toPx() },
+                modifier = Modifier.matchParentSize(),
             )
         }
     }
