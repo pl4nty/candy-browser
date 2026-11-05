@@ -50,4 +50,24 @@ class AddressBarControlRulesTest {
             ),
         )
     }
+
+    @Test
+    fun `editor starts full width when the bar was hidden before editing`() {
+        assertTrue(
+            AddressBarControlRules.editorUsesFullWidth(
+                editing = true,
+                addressFieldFocused = false,
+                imeVisible = false,
+                startsFullWidth = true,
+            ),
+        )
+        assertFalse(
+            AddressBarControlRules.editorUsesFullWidth(
+                editing = false,
+                addressFieldFocused = false,
+                imeVisible = false,
+                startsFullWidth = true,
+            ),
+        )
+    }
 }
