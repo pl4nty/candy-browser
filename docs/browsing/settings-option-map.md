@@ -26,7 +26,7 @@ and language selectors are outside this bounded redesign.
 | App icon | Icon selection | Scrollable radio-button list of all 12 launcher aliases with previews and full-row selection; Android component persistence |
 | Browser behavior | Browser setup; **Startup**, **Favorites**, **Web pages**, **Links & apps** detail pages | App language when locale list exists; engine omitted in SystemWebView-only build; default browser; startup animation, startup address focus, home startup; favorite animation + dependent speed, bookmark HTML import; device search, link routing, immersive mode, scrollbar, translation; app link handling, external preview + dependent profile |
 | Tabs | Overview; **Tab lifecycle** and **Profile options** detail pages | Overview Hero/Grid/List + list origin disabled for Hero; stack folder Hero/Grid/List on its own preview page; recent sorting; undo closed tab on its own feature page; resident limit; auto-close lifetime; profiles + Guest Bubble dependent on profiles and platform availability |
-| Gestures | **Link interactions**, **Address bar buttons**, **Gestures** detail pages | Address long press; separate link long-press and Link Peek swipe selection pages (swipe entry visible disabled outside Link Peek); Link Peek buttons; address buttons; menu actions; parked pill docking; swipe mode; fast action button and its replace-the-address-bar option; dismissal resistance |
+| Gestures | **Link interactions**, **Address bar buttons**, **Gestures** detail pages | Address long press; separate link long-press and Link Peek swipe selection pages (swipe entry visible disabled outside Link Peek); Link Peek buttons; address buttons; menu actions; parked pill docking; swipe mode; fast action button; dismissal resistance |
 | Gestures → Address bar buttons → Address long press | Existing semantic action sections | Every AddressBarLongPressAction enum option; radio selection remains mutually exclusive |
 | Gestures → Address bar buttons → Address bar actions | Existing visible/hidden action editor groups | Every AddressBarAction, order, visibility and drag behavior preserved |
 | Gestures → Link interactions → Link Peek buttons | Existing visible/hidden action editor groups | Every LinkPeekAction, order, visibility and drag behavior preserved |
@@ -386,7 +386,6 @@ Source: `app/src/main/java/dev/sk2andy/materialbrowser/ui/TabSettingsPage.kt`
 - Move the parked address pill
 - Switch address pill with swipes
 - Fast action button
-- Replace the address bar
 - Tab dismissal resistance
 - Dynamic choice owners: `TabOverviewMode`, `InactiveTabLifetime`, `LinkLongPressAction`, `LinkPeekSwipeAction`
 

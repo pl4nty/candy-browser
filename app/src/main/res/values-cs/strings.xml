@@ -619,9 +619,7 @@
     <string name="settings_address_bar_swipe_mode_title">Přepínat adresní řádek gesty</string>
     <string name="settings_address_bar_swipe_mode_summary">Přejetím dolů na stránce rozbalíte adresní řádek a přejetím nahoru jej zmenšíte, i když stránku nelze posouvat. Po vypnutí řádek reaguje na posouvání stránky.</string>
     <string name="settings_fast_action_button_title">Tlačítko rychlých akcí</string>
-    <string name="settings_fast_action_button_summary">Zobrazí plovoucí tlačítko. Klepnutím otevřete rychlé akce, nebo stiskněte a přejeďte na akci.</string>
-    <string name="settings_fast_action_button_replaces_address_bar_title">Nahradit adresní řádek</string>
-    <string name="settings_fast_action_button_replaces_address_bar_summary">Skryje adresní pilulku. Klepnutím na tlačítko upravíte adresu, podržením a posunutím otevřete akce, nedávné karty a nabídku.</string>
+    <string name="settings_fast_action_button_summary">Skryje adresní pilulku. Klepnutím na tlačítko upravíte adresu, podržením a posunutím otevřete akce, nedávné karty a nabídku.</string>
     <string name="cd_fast_action_button">Rychlé akce</string>
     <string name="settings_address_bar_docking_subtitle">Přetáhněte zaparkovanou kapsli a pusťte ji v libovolné výšce. Přichytí se k nejbližšímu okraji obrazovky. Vypnutím ponecháte adresní řádek uprostřed.</string>
     <string name="settings_tab_dismiss_resistance">Odpor při zavírání panelu</string>

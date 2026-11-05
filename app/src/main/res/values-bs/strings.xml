@@ -611,9 +611,7 @@
     <string name="settings_address_bar_swipe_mode_title">Mijenjaj adresnu traku prevlačenjem</string>
     <string name="settings_address_bar_swipe_mode_summary">Prevucite prema dolje na stranici da proširite traku, a prema gore da je sažmete, čak i kada se stranica ne može pomjerati. Kada je isključeno, traka prati pomjeranje stranice.</string>
     <string name="settings_fast_action_button_title">Dugme za brze radnje</string>
-    <string name="settings_fast_action_button_summary">Prikazuje plutajuće dugme. Dodirnite ga za brze radnje ili pritisnite i povucite do radnje.</string>
-    <string name="settings_fast_action_button_replaces_address_bar_title">Zamijeni adresnu traku</string>
-    <string name="settings_fast_action_button_replaces_address_bar_summary">Sakriva adresnu traku. Dodirnite dugme da uredite adresu ili zadržite i prevucite za radnje, nedavne kartice i meni.</string>
+    <string name="settings_fast_action_button_summary">Sakriva adresnu traku. Dodirnite dugme da uredite adresu ili zadržite i prevucite za radnje, nedavne kartice i meni.</string>
     <string name="cd_fast_action_button">Brze radnje</string>
     <string name="settings_address_bar_docking_subtitle">Povucite tabletu i pustite je na bilo kojoj visini da bi je stavili na najbliži rub ekrana. Isključi da bi adresna traka bila u centru.</string>
     <string name="settings_tab_dismiss_resistance">Otpor zatvaranju kartice</string>

@@ -117,7 +117,6 @@ internal fun SettingsScreen(
     isAddressBarDockingEnabled: Boolean,
     isAddressBarSwipeModeEnabled: Boolean = false,
     isFastActionButtonEnabled: Boolean = false,
-    isFastActionButtonReplacingAddressBar: Boolean = false,
     isExternalLinkPreviewEnabled: Boolean = false,
     externalLinkPreviewProfileId: String? = null,
     externalLinkPreviewProfiles: List<BrowserProfile> = emptyList(),
@@ -202,7 +201,6 @@ internal fun SettingsScreen(
     onAddressBarDockingEnabledChanged: (Boolean) -> Unit,
     onAddressBarSwipeModeEnabledChanged: (Boolean) -> Unit = {},
     onFastActionButtonEnabledChanged: (Boolean) -> Unit = {},
-    onFastActionButtonReplacesAddressBarChanged: (Boolean) -> Unit = {},
     onExternalLinkPreviewEnabledChanged: (Boolean) -> Unit = {},
     onExternalLinkPreviewProfileChanged: (String?) -> Unit = {},
     onExternalAppLinkHandlingChanged: (ExternalAppLinkHandling) -> Unit = {},
@@ -384,7 +382,6 @@ internal fun SettingsScreen(
                     isAddressBarDockingEnabled = isAddressBarDockingEnabled,
                     isAddressBarSwipeModeEnabled = isAddressBarSwipeModeEnabled,
                     isFastActionButtonEnabled = isFastActionButtonEnabled,
-                    isFastActionButtonReplacingAddressBar = isFastActionButtonReplacingAddressBar,
                     addressBarLongPressAction = addressBarLongPressAction,
                     linkLongPressAction = linkLongPressAction,
                     linkPeekSwipeAction = linkPeekSwipeAction,
@@ -403,8 +400,6 @@ internal fun SettingsScreen(
                     onAddressBarDockingEnabledChanged = onAddressBarDockingEnabledChanged,
                     onAddressBarSwipeModeEnabledChanged = onAddressBarSwipeModeEnabledChanged,
                     onFastActionButtonEnabledChanged = onFastActionButtonEnabledChanged,
-                    onFastActionButtonReplacesAddressBarChanged =
-                        onFastActionButtonReplacesAddressBarChanged,
                     onAddressBarLongPressActions = {
                         onDestinationChanged(SettingsDestination.AddressBarLongPressActions)
                     },
