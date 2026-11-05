@@ -18,6 +18,8 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.absoluteOffset
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.foundation.layout.size
@@ -56,6 +58,8 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.LayoutDirection
@@ -63,7 +67,22 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import dev.sk2andy.materialbrowser.R
 import dev.sk2andy.materialbrowser.browser.BrowserTab
+import dev.sk2andy.materialbrowser.data.BrowserAddressLoadStyle
+import dev.sk2andy.materialbrowser.ui.theme.BrowserChromeSurfaceRole
+import dev.sk2andy.materialbrowser.ui.theme.browserChromeSurfaceTokens
 import kotlin.math.roundToInt
+
+/**
+ * Resting look of the button when it replaces the address bar: the address bar's compact pill,
+ * with the domain and the address bar's load outline.
+ */
+internal data class FastActionPill(
+    val tabId: String,
+    val domain: String,
+    val isLoading: Boolean,
+    val progressPercent: Int,
+    val loadStyle: BrowserAddressLoadStyle,
+)
 
 internal object FastActionButtonTestTags {
     const val Button = "fast_action_button"
@@ -75,6 +94,10 @@ internal object FastActionButtonTestTags {
 }
 
 private val ButtonSize = 56.dp
+// Matches the address bar's compact (scrolled) pill.
+private val PillHeight = 48.dp
+private val PillMinWidth = 96.dp
+private val PillMaxWidth = 240.dp
 private val InnerItemSize = 44.dp
 private val OuterItemSize = 56.dp
 private val InnerRadius = 84.dp
@@ -91,6 +114,8 @@ private val DiscRadius = OuterRadius
  * @param showMenu adds the main-menu bubble at the start of the outer arc, in place of one tab.
  * @param onTap when set, a quick tap runs it instead of opening the disc, and the disc opens on
  * hold or slide. Used when the button replaces the address bar, so a tap edits the address.
+ * @param pill when set, the button rests as the address bar's compact domain pill, not a circle.
+ * @param hidden hides the resting button, as the address bar collapses while scrolling down.
  */
 @Composable
 internal fun BoxScope.FastActionButton(
@@ -108,6 +133,8 @@ internal fun BoxScope.FastActionButton(
     showMenu: Boolean = false,
     onMenu: () -> Unit = {},
     onTap: (() -> Unit)? = null,
+    pill: FastActionPill? = null,
+    hidden: Boolean = false,
 ) {
     val view = LocalView.current
     val density = LocalDensity.current
@@ -129,6 +156,12 @@ internal fun BoxScope.FastActionButton(
     }
     var expanded by remember { mutableStateOf(false) }
     var highlighted by remember { mutableStateOf<FastActionTarget?>(null) }
+    val buttonHeight = if (pill != null) PillHeight else ButtonSize
+    val restingVisibility by animateFloatAsState(
+        targetValue = if (hidden && !expanded) 0f else 1f,
+        animationSpec = tween(durationMillis = 200, easing = FastOutSlowInEasing),
+        label = "fastActionResting",
+    )
     val progress by animateFloatAsState(
         targetValue = if (expanded) 1f else 0f,
         animationSpec = spring(dampingRatio = 0.75f, stiffness = FastActionButtonRules.ITEM_SPRING_STIFFNESS),
@@ -171,7 +204,7 @@ internal fun BoxScope.FastActionButton(
     // Every layer is anchored on the button centre at the bottom centre of the chrome.
     fun Modifier.anchored(itemSize: Dp, offset: FastActionOffset): Modifier = this
         .align(Alignment.BottomCenter)
-        .padding(bottom = bottomPadding + (ButtonSize - itemSize) / 2)
+        .padding(bottom = bottomPadding + (buttonHeight - itemSize) / 2)
         .absoluteOffset {
             IntOffset((offset.x * progress).roundToInt(), (offset.y * progress).roundToInt())
         }
@@ -194,13 +227,13 @@ internal fun BoxScope.FastActionButton(
         Box(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
-                .padding(bottom = bottomPadding + ButtonSize / 2)
+                .padding(bottom = bottomPadding + buttonHeight / 2)
                 .absoluteOffset { IntOffset(0, discRadiusPx.roundToInt()) }
                 .zIndex(29.5f)
                 .requiredSize(DiscRadius * 2)
                 .graphicsLayer {
                     val grow = discProgress.coerceIn(0f, 1f)
-                    val scale = ButtonSize.toPx() / DiscRadius.toPx() / 2f * (1f - grow) + grow
+                    val scale = buttonHeight.toPx() / DiscRadius.toPx() / 2f * (1f - grow) + grow
                     scaleX = scale
                     scaleY = scale
                     alpha = 0.5f + 0.5f * grow
@@ -290,7 +323,7 @@ internal fun BoxScope.FastActionButton(
                 contentColor = MaterialTheme.colorScheme.inverseOnSurface,
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
-                    .padding(bottom = bottomPadding + ButtonSize / 2 + OuterRadius + OuterItemSize / 2 + 16.dp)
+                    .padding(bottom = bottomPadding + buttonHeight / 2 + OuterRadius + OuterItemSize / 2 + 16.dp)
                     .padding(horizontal = 24.dp)
                     .zIndex(31f),
             ) {
@@ -305,16 +338,33 @@ internal fun BoxScope.FastActionButton(
     }
 
     val buttonDescription = stringResource(R.string.cd_fast_action_button)
+    // Scrolling down hides the resting button entirely; it is not composed, so it takes no touches.
+    if (restingVisibility <= 0.01f) return
+    val chromeTokens = browserChromeSurfaceTokens(BrowserChromeSurfaceRole.AddressBar)
     Surface(
-        shape = CircleShape,
-        color = MaterialTheme.colorScheme.primaryContainer,
-        contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-        shadowElevation = if (expanded) 0.dp else 6.dp,
+        shape = if (pill != null) RoundedCornerShape(chromeTokens.cornerRadius) else CircleShape,
+        color = if (pill != null) chromeTokens.containerColor else MaterialTheme.colorScheme.primaryContainer,
+        contentColor = if (pill != null) chromeTokens.contentColor else MaterialTheme.colorScheme.onPrimaryContainer,
+        shadowElevation = when {
+            expanded -> 0.dp
+            pill != null -> chromeTokens.shadowElevation
+            else -> 6.dp
+        },
         modifier = modifier
             .align(Alignment.BottomCenter)
             .padding(bottom = bottomPadding)
             .zIndex(32f)
-            .size(ButtonSize)
+            .graphicsLayer {
+                alpha = restingVisibility
+                translationY = (1f - restingVisibility) * (buttonHeight.toPx() + bottomPadding.toPx())
+            }
+            .then(
+                if (pill != null) {
+                    Modifier.height(PillHeight).widthIn(min = PillMinWidth, max = PillMaxWidth)
+                } else {
+                    Modifier.size(ButtonSize)
+                },
+            )
             .testTag(FastActionButtonTestTags.Button)
             .semantics { contentDescription = buttonDescription }
             .pointerInput(isRtl, innerRadiusPx, outerRadiusPx) {
@@ -401,13 +451,37 @@ internal fun BoxScope.FastActionButton(
                 }
             },
     ) {
-        Box(contentAlignment = Alignment.Center) {
-            // GX-style ring glyph.
-            Box(
-                modifier = Modifier
-                    .size(22.dp)
-                    .border(2.dp, LocalContentColor.current, CircleShape),
-            )
+        if (pill != null) {
+            Box(contentAlignment = Alignment.Center) {
+                Text(
+                    text = pill.domain,
+                    style = MaterialTheme.typography.labelMedium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.padding(horizontal = 18.dp),
+                )
+                // The address bar's own load outline, traced around the pill.
+                AddressLoadCapsuleFeedback(
+                    tabId = pill.tabId,
+                    isLoading = pill.isLoading,
+                    progressPercent = pill.progressPercent,
+                    style = pill.loadStyle,
+                    morphProgress = 0f,
+                    morphTargetSizePx = with(density) { PillHeight.toPx() },
+                    sourceCornerRadiusPx = with(density) { chromeTokens.cornerRadius.toPx() },
+                    modifier = Modifier.matchParentSize(),
+                )
+            }
+        } else {
+            Box(contentAlignment = Alignment.Center) {
+                // GX-style ring glyph.
+                Box(
+                    modifier = Modifier
+                        .size(22.dp)
+                        .border(2.dp, LocalContentColor.current, CircleShape),
+                )
+            }
         }
     }
 }
