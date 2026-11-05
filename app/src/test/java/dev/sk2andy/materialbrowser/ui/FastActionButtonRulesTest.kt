@@ -203,4 +203,13 @@ class FastActionButtonRulesTest {
         val settleRatio = sqrt(700f / FastActionButtonRules.ITEM_SPRING_STIFFNESS)
         assertEquals(0.7f, settleRatio, 0.01f)
     }
+
+    @Test
+    fun `only new tab skips the button's own confirm vibration`() {
+        val newTab = FastActionButtonRules.InnerActions.indexOf(FastAction.NewTab)
+        FastActionButtonRules.InnerActions.indices.forEach { index ->
+            assertEquals(index != newTab, FastActionButtonRules.confirmsWithHaptic(FastActionTarget.Inner(index)))
+        }
+        assertTrue(FastActionButtonRules.confirmsWithHaptic(FastActionTarget.Outer(0)))
+    }
 }

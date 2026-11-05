@@ -84,6 +84,13 @@ internal object FastActionButtonRules {
      */
     const val ITEM_SPRING_STIFFNESS = 1430f
 
+    /**
+     * Whether running [target] should give the button's own confirm vibration. New tab already
+     * confirms itself when the tab is created, so a second vibration would double up.
+     */
+    fun confirmsWithHaptic(target: FastActionTarget): Boolean =
+        !(target is FastActionTarget.Inner && InnerActions.getOrNull(target.index) == FastAction.NewTab)
+
     /** Inner ring, from the left end of the half-disc to the right end in left-to-right layouts. */
     val InnerActions: List<FastAction> = listOf(
         FastAction.Reload,
