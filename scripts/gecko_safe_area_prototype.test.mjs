@@ -3436,3 +3436,46 @@ test('body bootstrap runs synchronously on arrival and preserves parser author p
   const existing = fixture(); existing.body.computed.paddingTop = '100px'; existing.start(false);
   assert.equal(existing.computed(existing.body).paddingTop, '100px', 'First configure protects an existing body synchronously');
 });
+
+test('a scroll-locked viewport page that scrolls only by the body inset switches to native insets', () => {
+  // Facebook reels: html overflow hidden, content exactly fills the viewport, and a script
+  // scroll slides the reel under its sticky top bar.
+  const f = fixture({ themeColor: '#000000' });
+  f.context.document.documentElement.computed.overflowY = 'hidden';
+  f.context.document.documentElement.scrollHeight = 800 + 32;
+  f.start();
+  assert.deepEqual(f.fallbacks, []);
+  f.scrollTo(30);
+  f.event('scroll');
+  assert.deepEqual(f.fallbacks, [[1, 1, '#000000', true]]);
+  f.scrollTo(31);
+  f.event('scroll');
+  assert.equal(f.fallbacks.length, 1, 'The fallback is requested once per navigation');
+});
+
+test('a scroll-locked body counts as a scroll-locked page', () => {
+  const f = fixture();
+  f.body.computed.overflowY = 'clip';
+  f.context.document.documentElement.scrollHeight = 832;
+  f.start();
+  f.scrollTo(32);
+  f.event('scroll');
+  assert.deepEqual(f.fallbacks, [[1, 1, null, true]]);
+});
+
+test('scrolling pages and long scroll-locked pages keep the scrollable body inset', () => {
+  const scrolling = fixture();
+  scrolling.context.document.documentElement.scrollHeight = 832;
+  scrolling.start();
+  scrolling.scrollTo(30);
+  scrolling.event('scroll');
+  assert.deepEqual(scrolling.fallbacks, [], 'A short page that can scroll stays edge-to-edge');
+
+  const modal = fixture();
+  modal.context.document.documentElement.computed.overflowY = 'hidden';
+  modal.context.document.documentElement.scrollHeight = 4000;
+  modal.start();
+  modal.scrollTo(30);
+  modal.event('scroll');
+  assert.deepEqual(modal.fallbacks, [], 'A long page behind a scroll-locking modal stays edge-to-edge');
+});

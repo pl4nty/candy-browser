@@ -2436,7 +2436,37 @@
     schedule();
   }
 
+  // A scroll-locked page (root or body overflow hidden/clip) that fits the viewport has no
+  // scroll range of its own, but the body inset adds one. Script scrolls (focus, scrollIntoView)
+  // then slide its content under its fixed or sticky chrome, as on Facebook reels. Native insets
+  // keep such app-like pages the same height as the viewport.
+  function scrollRevealsOnlyBodyInset() {
+    const root = document.documentElement;
+    const body = document.body;
+    if (!configuration?.active || configuration.cover || nativeFallbackRequested || !(inset > 0) ||
+        !root || !body || protectedBody !== body || (Number(globalThis.scrollY) || 0) <= 0.5) return false;
+    const locksScrolling = (element) => ["hidden", "clip"].includes(getComputedStyle(element).overflowY);
+    if (!locksScrolling(root) && !locksScrolling(body)) return false;
+    const viewportHeight = Number(globalThis.innerHeight) || 0;
+    return viewportHeight > 0 && (Number(root.scrollHeight) || 0) - viewportHeight <= inset + 1;
+  }
+
+  function requestNativeFallbackForScrollLock() {
+    nativeFallbackRequested = true;
+    nativeFallbackThemeColor = activeThemeColor();
+    globalThis.CandyContentTopInset?.fallbackToNative?.(
+      configuration.navigationGeneration,
+      configuration.revision,
+      nativeFallbackThemeColor,
+      true,
+    );
+  }
+
   function scroll() {
+    if (scrollRevealsOnlyBodyInset()) {
+      requestNativeFallbackForScrollLock();
+      return;
+    }
     scrollGeneration++;
     if (bodyProtectionResizeObserver) lastBodyProtectionScroll = performance.now();
     const semanticWasPending = semanticCheckPending;
