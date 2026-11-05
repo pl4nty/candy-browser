@@ -23,7 +23,7 @@ jobs:
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 90
     env:
-      INPUT_CHANGELOG: release-notes/0.48.0.md
+      INPUT_CHANGELOG: release-notes/0.47.0.md
     steps:
       - name: Check out source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
