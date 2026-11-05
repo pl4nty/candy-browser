@@ -51,8 +51,8 @@ import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import dev.sk2andy.materialbrowser.BuildConfig
 import dev.sk2andy.materialbrowser.R
-import dev.sk2andy.materialbrowser.browser.AddressResolver
 import dev.sk2andy.materialbrowser.browser.BLANK_URL
+import dev.sk2andy.materialbrowser.browser.AddressResolver
 import dev.sk2andy.materialbrowser.browser.SearchShortcutRules
 import dev.sk2andy.materialbrowser.browser.BrowserController
 import dev.sk2andy.materialbrowser.browser.BrowserTab
@@ -746,18 +746,6 @@ internal fun BoxScope.BrowserAddressChrome(
                 fastActionMenuPending = true
             },
             onTap = if (fastActionReplacesBar) openAddressEditor else null,
-            pill = if (fastActionReplacesBar) {
-                FastActionPill(
-                    tabId = selectedTab.id,
-                    domain = AddressResolver.displayText(selectedTab.url),
-                    isLoading = selectedTab.isLoading,
-                    progressPercent = selectedTab.progress,
-                    loadStyle = controller.appearanceSettings.addressLoadStyle,
-                )
-            } else {
-                null
-            },
-            hidden = fastActionReplacesBar && controller.isBottomBarCompact,
         )
     }
 
