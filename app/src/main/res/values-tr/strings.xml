@@ -600,9 +600,7 @@
     <string name="settings_address_bar_swipe_mode_title">Adres çubuğunu kaydırarak değiştir</string>
     <string name="settings_address_bar_swipe_mode_summary">Çubuğu genişletmek için sayfada aşağı, küçültmek için yukarı kaydırın. Sayfa kaydırılamadığında da çalışır. Kapalıyken çubuk sayfanın kaydırılmasını takip eder.</string>
     <string name="settings_fast_action_button_title">Hızlı işlem düğmesi</string>
-    <string name="settings_fast_action_button_summary">Kayan bir düğme gösterir. Hızlı işlemler için dokunun veya basılı tutup bir işleme kaydırın.</string>
-    <string name="settings_fast_action_button_replaces_address_bar_title">Adres çubuğunun yerine geç</string>
-    <string name="settings_fast_action_button_replaces_address_bar_summary">Adres hapını gizler. Adresi düzenlemek için düğmeye dokunun veya işlemler, son sekmeler ve menü için basılı tutup kaydırın.</string>
+    <string name="settings_fast_action_button_summary">Adres hapını gizler. Adresi düzenlemek için düğmeye dokunun veya işlemler, son sekmeler ve menü için basılı tutup kaydırın.</string>
     <string name="cd_fast_action_button">Hızlı işlemler</string>
     <string name="settings_address_bar_docking_subtitle">Kenardaki alanı sürükleyip istediğiniz yükseklikte bırakın; en yakın ekran kenarına yerleşir. Adres çubuğunu ortada tutmak için kapatın.</string>
     <string name="settings_tab_dismiss_resistance">Sekme kapatma direnci</string>

@@ -590,9 +590,7 @@
     <string name="settings_address_bar_swipe_mode_title">スワイプでアドレスバーを切り替える</string>
     <string name="settings_address_bar_swipe_mode_summary">ページを下にスワイプするとアドレスバーが展開し、上にスワイプするとコンパクトになります。スクロールできないページでも使えます。オフの場合はページのスクロールに連動します。</string>
     <string name="settings_fast_action_button_title">クイックアクションボタン</string>
-    <string name="settings_fast_action_button_summary">フローティングボタンを表示します。タップでクイックアクションを開き、長押ししてスライドするとそのアクションを実行します。</string>
-    <string name="settings_fast_action_button_replaces_address_bar_title">アドレスバーを置き換える</string>
-    <string name="settings_fast_action_button_replaces_address_bar_summary">アドレスピルを非表示にします。ボタンをタップするとアドレスを編集し、長押ししてスライドするとアクション、最近のタブ、メニューを使えます。</string>
+    <string name="settings_fast_action_button_summary">アドレスピルを非表示にします。ボタンをタップするとアドレスを編集し、長押ししてスライドするとアクション、最近のタブ、メニューを使えます。</string>
     <string name="cd_fast_action_button">クイックアクション</string>
     <string name="settings_address_bar_docking_subtitle">駐車した錠剤を引っ張って 画面の最寄りの辺に 押し付けるように任意の高さで放出します アドレスバーを中心に保つためにオフにします.</string>
     <string name="settings_tab_dismiss_resistance">タブ解体抵抗</string>

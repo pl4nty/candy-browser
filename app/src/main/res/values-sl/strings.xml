@@ -618,9 +618,7 @@
     <string name="settings_address_bar_swipe_mode_title">Preklopi naslovno vrstico s potegi</string>
     <string name="settings_address_bar_swipe_mode_summary">Potegnite navzdol po strani, da razširite vrstico, in navzgor, da jo skrčite, tudi če se po strani ni mogoče pomikati. Ko je izklopljeno, vrstica sledi pomikanju strani.</string>
     <string name="settings_fast_action_button_title">Gumb za hitra dejanja</string>
-    <string name="settings_fast_action_button_summary">Prikaže plavajoči gumb. Tapnite za hitra dejanja ali pritisnite in podrsajte do dejanja.</string>
-    <string name="settings_fast_action_button_replaces_address_bar_title">Zamenjaj naslovno vrstico</string>
-    <string name="settings_fast_action_button_replaces_address_bar_summary">Skrije naslovno vrstico. Tapnite gumb za urejanje naslova ali pridržite in podrsajte za dejanja, nedavne zavihke in meni.</string>
+    <string name="settings_fast_action_button_summary">Skrije naslovno vrstico. Tapnite gumb za urejanje naslova ali pridržite in podrsajte za dejanja, nedavne zavihke in meni.</string>
     <string name="cd_fast_action_button">Hitra dejanja</string>
     <string name="settings_address_bar_docking_subtitle">Privlačite ustavil tableto in ga izpustite na kateri koli višini, da ga prilepite na najbližji rob zaslona. Izklopi, da boš imel naslovno vrstico v središču.</string>
     <string name="settings_tab_dismiss_resistance">Upor pri zapiranju zavihka</string>
