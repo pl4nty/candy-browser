@@ -453,14 +453,19 @@ internal fun BoxScope.FastActionButton(
     ) {
         if (pill != null) {
             Box(contentAlignment = Alignment.Center) {
-                Text(
-                    text = pill.domain,
-                    style = MaterialTheme.typography.labelMedium,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.padding(horizontal = 18.dp),
-                )
+                if (pill.domain.isEmpty()) {
+                    // A blank tab has no domain; show what a tap does instead of an empty pill.
+                    Icon(Icons.Default.Search, contentDescription = null)
+                } else {
+                    Text(
+                        text = pill.domain,
+                        style = MaterialTheme.typography.labelMedium,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.padding(horizontal = 18.dp),
+                    )
+                }
                 // The address bar's own load outline, traced around the pill.
                 AddressLoadCapsuleFeedback(
                     tabId = pill.tabId,
