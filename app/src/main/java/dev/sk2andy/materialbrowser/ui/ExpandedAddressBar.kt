@@ -170,6 +170,7 @@ internal fun ExpandedBottomBarContent(
     addressBarLongPressLabel: String,
     onAddressBarLongPress: () -> Unit,
     editing: Boolean,
+    editorStartsFullWidth: Boolean = false,
     addressBarStyle: BrowserAddressBarStyle,
     editValue: TextFieldValue,
     onEditValueChange: (TextFieldValue) -> Unit,
@@ -311,6 +312,7 @@ internal fun ExpandedBottomBarContent(
         editing = editing,
         addressFieldFocused = addressFieldFocused,
         imeVisible = WindowInsets.isImeVisible,
+        startsFullWidth = editorStartsFullWidth,
     )
     val segmentedEditorActive = segmentedAddressBar && editing
     val dynamicSlotCount = maxOf(

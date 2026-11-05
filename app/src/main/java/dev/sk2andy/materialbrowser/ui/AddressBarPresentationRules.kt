@@ -28,9 +28,14 @@ internal object AddressBarControlRules {
     fun tabCountLabel(tabCount: Int): String =
         if (tabCount > 99) "∞" else tabCount.coerceAtLeast(0).toString()
 
+    /**
+     * @param startsFullWidth the bar was hidden before editing (the fast action button replaces
+     * it), so there are no resting actions to fade out and the editor is full width at once.
+     */
     fun editorUsesFullWidth(
         editing: Boolean,
         addressFieldFocused: Boolean,
         imeVisible: Boolean,
-    ): Boolean = editing && addressFieldFocused && imeVisible
+        startsFullWidth: Boolean = false,
+    ): Boolean = editing && (startsFullWidth || addressFieldFocused && imeVisible)
 }
