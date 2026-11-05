@@ -108,7 +108,8 @@ jobs:
             app/src/main/assets/uassets_procedural_cosmetic_rules.txt \
             app/src/main/assets/uassets_filters_source.txt
           ./gradlew --no-daemon --parallel \
-            "-Dorg.gradle.jvmargs=-Xmx8g -Dfile.encoding=UTF-8" \
+            "-Dorg.gradle.jvmargs=-Xmx6g -Dfile.encoding=UTF-8" \
+            "-Pkotlin.daemon.jvmargs=-Xmx8g" \
             -Pcandy.releaseNotesFile="$INPUT_CHANGELOG" \
             testFullDebugUnitTest \
             testFossDebugUnitTest \
@@ -140,7 +141,8 @@ jobs:
             "app/build/outputs/apk/systemwebview/release/app-systemwebview-release.apk" \
             "$RUNNER_TEMP/candy-systemwebview-release.apk"
           ./gradlew --no-daemon --parallel \
-            "-Dorg.gradle.jvmargs=-Xmx8g -Dfile.encoding=UTF-8" \
+            "-Dorg.gradle.jvmargs=-Xmx6g -Dfile.encoding=UTF-8" \
+            "-Pkotlin.daemon.jvmargs=-Xmx8g" \
             -Pcandy.releaseNotesFile="$INPUT_CHANGELOG" \
             -Pcandy.releaseAbi=arm64-v8a \
             -Pcandy.compressNativeLibs=true \
