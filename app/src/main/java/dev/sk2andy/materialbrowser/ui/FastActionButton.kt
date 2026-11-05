@@ -156,7 +156,7 @@ internal fun BoxScope.FastActionButton(
 
     fun run(target: FastActionTarget) {
         close()
-        view.performConfirmHaptic()
+        if (FastActionButtonRules.confirmsWithHaptic(target)) view.performConfirmHaptic()
         when (target) {
             is FastActionTarget.Inner -> currentOnAction(actions[target.index])
             is FastActionTarget.Outer -> when (val item = currentOuterItems.getOrNull(target.index)) {
