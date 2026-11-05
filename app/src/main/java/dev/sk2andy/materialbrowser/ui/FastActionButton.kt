@@ -131,13 +131,13 @@ internal fun BoxScope.FastActionButton(
     var highlighted by remember { mutableStateOf<FastActionTarget?>(null) }
     val progress by animateFloatAsState(
         targetValue = if (expanded) 1f else 0f,
-        animationSpec = spring(dampingRatio = 0.75f, stiffness = 700f),
+        animationSpec = spring(dampingRatio = 0.75f, stiffness = FastActionButtonRules.ITEM_SPRING_STIFFNESS),
         label = "fastActionItems",
     )
     // The disc grows out of the button while it is held, ahead of the items.
     val discProgress by animateFloatAsState(
         targetValue = if (expanded) 1f else 0f,
-        animationSpec = tween(durationMillis = 240, easing = FastOutSlowInEasing),
+        animationSpec = tween(durationMillis = FastActionButtonRules.DISC_GROW_MILLIS, easing = FastOutSlowInEasing),
         label = "fastActionDisc",
     )
     val currentInnerEnabled by rememberUpdatedState(innerEnabled)
@@ -326,7 +326,9 @@ internal fun BoxScope.FastActionButton(
                     val tap = currentOnTap
                     if (openedByPress && tap != null) {
                         // A quick tap runs onTap; holding or sliding opens the disc instead.
-                        val outcome = withTimeoutOrNull(viewConfiguration.longPressTimeoutMillis) {
+                        val outcome = withTimeoutOrNull(
+                            FastActionButtonRules.holdToOpenMillis(viewConfiguration.longPressTimeoutMillis),
+                        ) {
                             var result = PressOutcome.Cancelled
                             while (true) {
                                 val change = awaitPointerEvent().changes.firstOrNull { it.id == down.id } ?: break

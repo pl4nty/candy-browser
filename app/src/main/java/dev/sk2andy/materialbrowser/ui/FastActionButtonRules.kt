@@ -69,6 +69,21 @@ internal sealed interface FastActionOuterItem {
  * offsets use screen coordinates (y grows downward), matching Compose layout space.
  */
 internal object FastActionButtonRules {
+    /**
+     * How long a press must be held before the disc opens when a tap has its own action, as
+     * 70% of the system long-press timeout (400 ms by default), so the disc starts sooner.
+     */
+    fun holdToOpenMillis(longPressTimeoutMillis: Long): Long = longPressTimeoutMillis * 7 / 10
+
+    /** Duration of the disc growing out of the button; 70% of the original 240 ms. */
+    const val DISC_GROW_MILLIS = 168
+
+    /**
+     * Stiffness of the spring that moves the items out. Settle time scales with
+     * 1 / sqrt(stiffness), so 700 / 0.7^2 makes it 70% of the original 700 spring.
+     */
+    const val ITEM_SPRING_STIFFNESS = 1430f
+
     /** Inner ring, from the left end of the half-disc to the right end in left-to-right layouts. */
     val InnerActions: List<FastAction> = listOf(
         FastAction.Reload,
