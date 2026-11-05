@@ -42,8 +42,8 @@ concurrency:
 jobs:
   release:
     name: Build and publish v${{ inputs.version }}
-    # Namespace 32 vCPU / 64 GB profile; the 4 vCPU GitHub runner took about an hour.
-    runs-on: namespace-profile-cached
+    # Namespace 8 vCPU / 16 GB: about 18 min with two Gradle workers, against 57 min on ubuntu-latest.
+    runs-on: nscloud-ubuntu-24.04-amd64-8x16
     timeout-minutes: 90
     environment: release
     env:
@@ -253,21 +253,31 @@ jobs:
             app/src/main/assets/uassets_cosmetic_rules.txt \
             app/src/main/assets/uassets_procedural_cosmetic_rules.txt \
             app/src/main/assets/uassets_filters_source.txt
-          ./gradlew --no-daemon --max-workers=1 \
+          ./gradlew --no-daemon --max-workers=2 \
+            "-Dorg.gradle.jvmargs=-Xmx4g -Dfile.encoding=UTF-8" \
+            -Pkotlin.daemon.jvmargs=-Xmx8g \
             -Pcandy.releaseNotesFile="$INPUT_CHANGELOG" \
             testFullDebugUnitTest \
             testFossDebugUnitTest \
             testSystemwebviewDebugUnitTest
-          ./gradlew --no-daemon --max-workers=1 \
+          ./gradlew --no-daemon --max-workers=2 \
+            "-Dorg.gradle.jvmargs=-Xmx4g -Dfile.encoding=UTF-8" \
+            -Pkotlin.daemon.jvmargs=-Xmx8g \
             -Pcandy.releaseNotesFile="$INPUT_CHANGELOG" \
             assembleFullRelease
-          ./gradlew --no-daemon --max-workers=1 \
+          ./gradlew --no-daemon --max-workers=2 \
+            "-Dorg.gradle.jvmargs=-Xmx4g -Dfile.encoding=UTF-8" \
+            -Pkotlin.daemon.jvmargs=-Xmx8g \
             -Pcandy.releaseNotesFile="$INPUT_CHANGELOG" \
             assembleFossRelease
-          ./gradlew --no-daemon --max-workers=1 \
+          ./gradlew --no-daemon --max-workers=2 \
+            "-Dorg.gradle.jvmargs=-Xmx4g -Dfile.encoding=UTF-8" \
+            -Pkotlin.daemon.jvmargs=-Xmx8g \
             -Pcandy.releaseNotesFile="$INPUT_CHANGELOG" \
             assembleSystemwebviewRelease
-          ./gradlew --no-daemon --max-workers=1 \
+          ./gradlew --no-daemon --max-workers=2 \
+            "-Dorg.gradle.jvmargs=-Xmx4g -Dfile.encoding=UTF-8" \
+            -Pkotlin.daemon.jvmargs=-Xmx8g \
             -Pcandy.releaseNotesFile="$INPUT_CHANGELOG" \
             assembleFullUserCaRelease
           CANDY_STANDARD_APK="app/build/outputs/apk/full/release/app-full-release.apk" \
@@ -292,7 +302,9 @@ jobs:
           cp \
             "app/build/outputs/apk/systemwebview/release/app-systemwebview-release.apk" \
             "$RUNNER_TEMP/candy-systemwebview-release.apk"
-          ./gradlew --no-daemon --max-workers=1 \
+          ./gradlew --no-daemon --max-workers=2 \
+            "-Dorg.gradle.jvmargs=-Xmx4g -Dfile.encoding=UTF-8" \
+            -Pkotlin.daemon.jvmargs=-Xmx8g \
             -Pcandy.releaseNotesFile="$INPUT_CHANGELOG" \
             -Pcandy.releaseAbi=arm64-v8a \
             -Pcandy.compressNativeLibs=true \
