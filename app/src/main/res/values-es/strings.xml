@@ -585,9 +585,7 @@
     <string name="settings_address_bar_swipe_mode_title">Cambiar la barra de direcciones con gestos</string>
     <string name="settings_address_bar_swipe_mode_summary">Desliza hacia abajo en la página para expandir la barra y hacia arriba para compactarla, incluso si la página no se puede desplazar. Si está desactivado, la barra sigue el desplazamiento de la página.</string>
     <string name="settings_fast_action_button_title">Botón de acciones rápidas</string>
-    <string name="settings_fast_action_button_summary">Muestra un botón flotante. Tócalo para ver acciones rápidas, o mantén pulsado y desliza hasta una acción.</string>
-    <string name="settings_fast_action_button_replaces_address_bar_title">Sustituir la barra de direcciones</string>
-    <string name="settings_fast_action_button_replaces_address_bar_summary">Oculta la píldora de dirección. Toca el botón para editar la dirección, o mantén pulsado y desliza para acciones, pestañas recientes y el menú.</string>
+    <string name="settings_fast_action_button_summary">Oculta la píldora de dirección. Toca el botón para editar la dirección, o mantén pulsado y desliza para acciones, pestañas recientes y el menú.</string>
     <string name="cd_fast_action_button">Acciones rápidas</string>
     <string name="settings_address_bar_docking_subtitle">Arrastra la píldora aparcada y suéltala a cualquier altura para fijarla al borde de pantalla más cercano. Desactívalo para mantener la barra centrada.</string>
     <string name="settings_tab_dismiss_resistance">Resistencia al cerrar pestañas</string>

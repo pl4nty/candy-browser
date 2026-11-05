@@ -611,9 +611,7 @@
     <string name="settings_address_bar_swipe_mode_title">Мењај адресну траку превлачењем</string>
     <string name="settings_address_bar_swipe_mode_summary">Превуците надоле на страници да проширите траку, а нагоре да је сажмете, чак и када страница не може да се помера. Када је искључено, трака прати померање странице.</string>
     <string name="settings_fast_action_button_title">Дугме за брзе радње</string>
-    <string name="settings_fast_action_button_summary">Приказује плутајуће дугме. Додирните га за брзе радње или притисните и превуците до радње.</string>
-    <string name="settings_fast_action_button_replaces_address_bar_title">Замени траку за адресу</string>
-    <string name="settings_fast_action_button_replaces_address_bar_summary">Скрива траку за адресу. Додирните дугме да измените адресу или задржите и превуците за радње, недавне картице и мени.</string>
+    <string name="settings_fast_action_button_summary">Скрива траку за адресу. Додирните дугме да измените адресу или задржите и превуците за радње, недавне картице и мени.</string>
     <string name="cd_fast_action_button">Брзе радње</string>
     <string name="settings_address_bar_docking_subtitle">Повуците паркирану пилулу и пустите је на било коју висину да бисте је ставили на најближу ивицу екрана. Искључите да би адресна трака остала у центру.</string>
     <string name="settings_tab_dismiss_resistance">Отпор затварању картице</string>
