@@ -42,7 +42,8 @@ concurrency:
 jobs:
   release:
     name: Build and publish v${{ inputs.version }}
-    runs-on: ubuntu-latest
+    # Namespace 32 vCPU / 64 GB profile; the 4 vCPU GitHub runner took about an hour.
+    runs-on: namespace-profile-cached
     timeout-minutes: 90
     environment: release
     env:
