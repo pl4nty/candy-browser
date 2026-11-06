@@ -126,6 +126,7 @@ internal fun BrowserBottomBar(
     dockState: AddressBarDockState,
     dockTargetEdge: AddressBarDockEdge,
     editing: Boolean,
+    editorStartsFullWidth: Boolean = false,
     addressBarStyle: BrowserAddressBarStyle,
     addressLoadStyle: BrowserAddressLoadStyle = BrowserAddressLoadStyle.Rainbow,
     actionLayout: AddressBarActionLayout,
@@ -261,6 +262,8 @@ internal fun BrowserBottomBar(
     backdropBlurRegionEnabled: Boolean = true,
     onBackdropBlurRegionChanged: (BrowserBackdropBlurRegion?) -> Unit = {},
     menuDismissRequestId: Int = 0,
+    menuOpenRequestId: Int = 0,
+    onMenuOpenChanged: (Boolean) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val docked = dockState.placement != null
@@ -270,6 +273,12 @@ internal fun BrowserBottomBar(
     LaunchedEffect(menuDismissRequestId) {
         if (menuDismissRequestId != 0) menuExpanded = false
     }
+    LaunchedEffect(menuOpenRequestId) {
+        if (menuOpenRequestId != 0) menuExpanded = true
+    }
+    val currentOnMenuOpenChanged by rememberUpdatedState(onMenuOpenChanged)
+    val menuOpen = menuExpanded || menuSheetVisible
+    LaunchedEffect(menuOpen) { currentOnMenuOpenChanged(menuOpen) }
     val focusRequester = remember { androidx.compose.ui.focus.FocusRequester() }
     val presentation = AddressBarPresentationRules.resolve(
         docked = docked,
@@ -624,6 +633,7 @@ internal fun BrowserBottomBar(
                                 addressBarLongPressLabel = addressBarLongPressLabel,
                                 onAddressBarLongPress = onAddressBarLongPress,
                                 editing = editing,
+                                editorStartsFullWidth = editorStartsFullWidth,
                                 addressBarStyle = addressBarStyle,
                                 editValue = editValue,
                                 onEditValueChange = onEditValueChange,

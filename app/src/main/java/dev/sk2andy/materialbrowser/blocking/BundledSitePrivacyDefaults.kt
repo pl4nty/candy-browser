@@ -12,6 +12,9 @@ internal class BundledSitePrivacyDefaults private constructor(
     fun cookieBannerRemovalDisabled(host: String?): Boolean =
         normalizedHost(host) in cookieBannerRemovalDisabledHosts
 
+    fun forceSafeArea(host: String?): Boolean =
+        normalizedHost(host) in FORCE_SAFE_AREA_HOSTS
+
     private fun normalizedHost(host: String?): String? =
         PrivacyRequestSanitizer.normalizeHost(host)
 
@@ -20,6 +23,13 @@ internal class BundledSitePrivacyDefaults private constructor(
         private const val COOKIE_BANNER_REMOVAL_DISABLED = "cookie_banner_removal_disabled"
         private const val FORCE_VERTICAL_SCROLL = "force_vertical_scroll"
         private const val FORMAT_HEADER = "# candy site privacy defaults v2"
+
+        // Hosts that start below the status bar, as if "Force safe area" were on. Kept out of the
+        // generated asset so that regenerating it from the audit keeps them.
+        // Facebook reels lock scrolling and size the reel to the viewport, then scroll the page
+        // while loading. Edge-to-edge CSS lets the reel slide under Facebook's top bar, which then
+        // covers "Tap to unmute"; the layout differs by region, so CSS detection misses some.
+        private val FORCE_SAFE_AREA_HOSTS = setOf("www.facebook.com", "m.facebook.com", "facebook.com")
 
         val Empty = BundledSitePrivacyDefaults(emptySet(), emptySet())
 

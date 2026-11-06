@@ -46,6 +46,7 @@ collection after a committed or cancelled gesture.
 | Browser menu presentation | Android **Gestures → Address bar buttons → Menu actions** chooses Floating menu or Bottom sheet and Scroll or two Swipe pages; five lower-toolbar positions accept all supported individual tab-menu actions or empty slots; global stable preferences retain placement and slot order. | `BrowserMenuLayout`, `BrowserMenuSettingsPage`, `BrowserSessionStore` |
 | Address-bar actions | Persisted ordered action layout plus drag-editor navigation under Gestures | `data/AddressBarActionLayout.kt`, `ui/AddressBarActionEditor.kt`, `BrowserSessionStore` |
 | Address-pill swipe mode | Persisted opt-in under Gestures; vertical swipes on the page expand downward and compact upward, including pages without scrolling. Disabled mode retains page-scroll behavior. | `BrowserSessionStore`, `BrowserController`, `ui/TabSettingsPage`, `ui/BrowserViewport` |
+| Fast action button | Persisted opt-in under Gestures; shows a centred Opera GX-style button whose half-disc holds page actions and recent tabs, that replaces the address pill: a tap edits the address, hold or slide opens the disc, and a three-dot bubble opens the main menu. | `BrowserSessionStore`, `BrowserController`, `ui/TabSettingsPage`, `ui/FastActionButton`, `ui/BrowserAddressChrome` |
 | Page scroll bar | Persisted opt-in, engine-neutral scroll metrics and draggable auto-hide overlay | `BrowserSessionStore`, browser-engine session ports, `ui/BrowserScrollBar` |
 | Developer options | Persisted hidden unlock, bounded safe-area fallback tuning, insecure-HTTP autofill override, process-local input diagnostics, privacy-safe runtime report, [opt-in app logging and export](app-logging.md), and presentation replay actions | `DeveloperSettings`, `BrowserSessionStore`, `AppLogging`, `BrowserInputDiagnostics`, `DeveloperDiagnosticsReport`, `BrowserController`, `MainActivity`, `ui/DeveloperOptionsSettingsPage` |
 | System bars | Status/navigation icon contrast for forced light and dark modes | `AppearanceSystemBars.kt` |
@@ -77,6 +78,7 @@ collection after a committed or cancelled gesture.
 | Long-press link action | Link Peek, copy, share, download, regular foreground/background tab, private foreground/background tab | Link Peek |
 | Link Peek right-swipe action | Background tab, foreground tab, new stack with source, private tab, copy, share, favorite, snooze, Reader offline; visible disabled unless Link Peek is selected | Background tab |
 | Switch address pill with swipes | Off: follows page scrolling; on: swipe down expands, swipe up compacts | Off |
+| Fast action button | Off: the address pill; on: the pill hides and a centred button replaces it. A tap edits the address; hold or slide opens page actions, recent tabs and a menu bubble | Off |
 | Candy Recall | Off, on | Off |
 | Page translation provider | Google Translate, Yandex Translate, Kagi Translate | Yandex Translate on Android; Google Translate on iOS |
 | Prevent automatic video playback | Off, on | Off |

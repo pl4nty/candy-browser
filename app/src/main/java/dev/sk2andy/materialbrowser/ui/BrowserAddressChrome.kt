@@ -12,6 +12,7 @@ import android.widget.Toast
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.AnimationVector1D
 import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -20,6 +21,7 @@ import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.ime
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -30,6 +32,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.MutableFloatState
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -219,7 +222,21 @@ internal fun BoxScope.BrowserAddressChrome(
         }
     }
 
-    val addressBarDockingAvailable = AddressBarDockingRules.isAvailable(
+    // The fast action button stands in for the address pill, which only appears while editing,
+    // in the tab overview, for command feedback, or to host its main menu.
+    val fastActionReplacesBar = controller.isFastActionButtonEnabled
+    var fastActionMenuRequestId by remember { mutableIntStateOf(0) }
+    var fastActionMenuPending by remember { mutableStateOf(false) }
+    var addressBarMenuOpen by remember { mutableStateOf(false) }
+    val addressBarShown = !fastActionReplacesBar ||
+        addressEditorVisible ||
+        commandFeedback != null ||
+        tabOverviewVisible ||
+        tabOverviewOpening ||
+        addressBarMorphInFront ||
+        fastActionMenuPending ||
+        addressBarMenuOpen
+    val addressBarDockingAvailable = !fastActionReplacesBar && AddressBarDockingRules.isAvailable(
         settingEnabled = controller.isAddressBarDockingEnabled,
         isBlankTab = selectedTab.url == BLANK_URL,
     )
@@ -254,6 +271,12 @@ internal fun BoxScope.BrowserAddressChrome(
         ),
     )
     var addressBarBoundsInRoot by remember { mutableStateOf<Rect?>(null) }
+    LaunchedEffect(addressBarShown) {
+        if (!addressBarShown) {
+            addressBarBoundsInRoot = null
+            bottomBarTopPx.floatValue = Float.NaN
+        }
+    }
     val autoDockGeometryAvailable = addressBarDockingAvailable &&
         effectiveAddressBarDockPlacement == null &&
         !addressEditorVisible &&
@@ -285,12 +308,18 @@ internal fun BoxScope.BrowserAddressChrome(
     DisposableEffect(controller) {
         onDispose(controller::clearAddressBarBoundsInViewport)
     }
-    BrowserBottomBar(
+    if (addressBarShown) BrowserBottomBar(
         onOpenMenuSettings = onOpenMenuSettings,
         menuDismissRequestId = menuDismissRequestId,
+        menuOpenRequestId = if (fastActionMenuPending) fastActionMenuRequestId else 0,
+        onMenuOpenChanged = { open ->
+            addressBarMenuOpen = open
+            if (open) fastActionMenuPending = false
+        },
         tab = selectedTab,
         pageTranslationProvider = controller.pageTranslationProvider,
         compact = controller.isBottomBarCompact &&
+            !fastActionReplacesBar &&
             !linkPeekAddressBarExpanded &&
             !wideWindow,
         dockState = AddressBarDockState(
@@ -299,6 +328,8 @@ internal fun BoxScope.BrowserAddressChrome(
         ),
         dockTargetEdge = controller.lastAddressBarDockEdge,
         editing = addressEditorVisible,
+        // The pill was hidden, so the editor opens without the resting actions fading out.
+        editorStartsFullWidth = fastActionReplacesBar,
         addressBarStyle = controller.appearanceSettings.addressBarStyle,
         addressLoadStyle = controller.appearanceSettings.addressLoadStyle,
         actionLayout = controller.addressBarActionLayout,
@@ -647,6 +678,79 @@ internal fun BoxScope.BrowserAddressChrome(
                 },
             ),
     )
+
+    if (
+        controller.isFastActionButtonEnabled &&
+        !tabOverviewVisible &&
+        !tabOverviewOpening &&
+        !addressEditorVisible &&
+        !settingsVisible &&
+        !addressBarMenuOpen &&
+        commandFeedback == null
+    ) {
+        val density = LocalDensity.current
+        val navigationBarBottomPx = WindowInsets.navigationBars.getBottom(density)
+        // Sit above the floating pill; when it is docked or not measured, sit above the nav bar.
+        val targetBottomPadding = with(density) {
+            val barTop = bottomBarTopPx.floatValue
+            if (barTop.isFinite() && barTop in 0f..browserHeightPx) {
+                (browserHeightPx - barTop).toDp() + 12.dp
+            } else {
+                navigationBarBottomPx.toDp() + 16.dp
+            }
+        }
+        val fastActionBottomPadding by animateDpAsState(
+            targetValue = targetBottomPadding,
+            label = "fastActionBottomPadding",
+        )
+        val recentFastActionTabs = remember(controller.activeTabs) {
+            val tabsById = controller.activeTabs.associateBy(BrowserTab::id)
+            FastActionButtonRules.recentTabIds(
+                controller.activeTabs.map { FastActionTabRecency(it.id, it.lastAccessedAt) },
+                max = FastActionButtonRules.maxRecentTabs(includeMenu = true),
+            ).mapNotNull(tabsById::get)
+        }
+        FastActionButton(
+            availability = FastActionAvailability(
+                canReload = selectedTab.url != BLANK_URL,
+                canShare = hasHttpPage,
+                canCloseTab = true,
+            ),
+            recentTabs = recentFastActionTabs,
+            selectedTabId = selectedTab.id,
+            favicons = controller.favicons,
+            tabCount = controller.activeTabs.size,
+            isLoading = selectedTab.isLoading,
+            bottomPadding = fastActionBottomPadding,
+            onAction = { action ->
+                when (action) {
+                    FastAction.Reload -> if (selectedTab.isLoading) {
+                        controller.stopLoading()
+                    } else {
+                        controller.reload()
+                    }
+                    FastAction.CloseTab -> controller.closeTabFromUser(selectedTab.id)
+                    FastAction.Search -> openAddressEditor()
+                    FastAction.NewTab -> openNewTabAndEdit()
+                    FastAction.Share -> controller.shareSelectedPage()
+                }
+            },
+            onSelectTab = { tabId ->
+                if (tabId != selectedTab.id) controller.selectTab(tabId)
+            },
+            onTabs = onTabs,
+            showMenu = true,
+            onMenu = {
+                fastActionMenuRequestId += 1
+                fastActionMenuPending = true
+            },
+            onTap = openAddressEditor,
+            progressPercent = selectedTab.progress,
+            loadStyle = controller.appearanceSettings.addressLoadStyle,
+            // Hides while scrolling down, as the address pill collapses, and returns on scroll up.
+            hidden = controller.isBottomBarCompact,
+        )
+    }
 
     if (
         !selectedTab.isIncognito &&

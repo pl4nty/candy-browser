@@ -324,6 +324,7 @@ class SettingsSearchCatalogTest {
             "settings_translation_provider" to SettingsDestination.Translations,
             "settings_address_bar_docking_title" to SettingsDestination.GestureControls,
             "settings_address_bar_swipe_mode_title" to SettingsDestination.GestureControls,
+            "settings_fast_action_button_title" to SettingsDestination.GestureControls,
             "settings_tab_dismiss_resistance" to SettingsDestination.GestureControls,
             "settings_status_bar_scroll_title" to SettingsDestination.GestureControls,
             "settings_status_bar_scroll_width_title" to SettingsDestination.GestureControls,
