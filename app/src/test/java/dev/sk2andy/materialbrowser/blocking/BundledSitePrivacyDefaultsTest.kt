@@ -1,6 +1,7 @@
 package dev.sk2andy.materialbrowser.blocking
 
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -38,5 +39,33 @@ class BundledSitePrivacyDefaultsTest {
         BundledSitePrivacyDefaults.parse(
             "# candy site privacy defaults v2\nforce_vertical_scroll\tNews.Example",
         )
+    }
+
+    @Test
+    fun `facebook starts below the status bar by default`() {
+        val defaults = BundledSitePrivacyDefaults.Empty
+        assertTrue(defaults.forceSafeArea("www.facebook.com"))
+        assertTrue(defaults.forceSafeArea("M.FACEBOOK.COM"))
+        assertTrue(defaults.forceSafeArea("facebook.com"))
+        assertFalse(defaults.forceSafeArea("notfacebook.com"))
+        assertFalse(defaults.forceSafeArea("news.example"))
+    }
+
+    @Test
+    fun `a site override wins over the bundled safe area default`() {
+        assertTrue(SitePrivacyOverrideRules.forceSafeArea(null, bundledDefault = true))
+        assertFalse(
+            SitePrivacyOverrideRules.forceSafeArea(
+                SitePrivacyOverrides(forceSafeArea = false),
+                bundledDefault = true,
+            ),
+        )
+        assertTrue(
+            SitePrivacyOverrideRules.forceSafeArea(
+                SitePrivacyOverrides(forceSafeArea = true),
+                bundledDefault = false,
+            ),
+        )
+        assertNull(SitePrivacyOverrideRules.overrideForSelection(enabled = true, bundledDefault = true))
     }
 }

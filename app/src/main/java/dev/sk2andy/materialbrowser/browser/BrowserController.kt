@@ -11423,11 +11423,11 @@ class BrowserController(
         }
 
     fun setForceSafeArea(tabId: String, enabled: Boolean): Boolean =
-        updateSitePrivacyOverrides(tabId, reloadAffectedPages = false) { current, _ ->
+        updateSitePrivacyOverrides(tabId, reloadAffectedPages = false) { current, host ->
             current.copy(
                 forceSafeArea = SitePrivacyOverrideRules.overrideForSelection(
                     enabled = enabled,
-                    bundledDefault = false,
+                    bundledDefault = bundledSitePrivacyDefaults.forceSafeArea(host),
                 ),
             )
         }
@@ -18507,7 +18507,10 @@ class BrowserController(
         SitePrivacyOverrideRules.forcePageZooming(sitePrivacyOverridesFor(tab)[host])
 
     private fun isSafeAreaForced(tab: BrowserTab, host: String): Boolean =
-        SitePrivacyOverrideRules.forceSafeArea(sitePrivacyOverridesFor(tab)[host])
+        SitePrivacyOverrideRules.forceSafeArea(
+            overrides = sitePrivacyOverridesFor(tab)[host],
+            bundledDefault = bundledSitePrivacyDefaults.forceSafeArea(host),
+        )
 
     private fun isFederatedLoginCompatibilityEnabled(tab: BrowserTab, pageUrl: String?): Boolean {
         val host = PrivacyRequestSanitizer.webHost(pageUrl ?: tab.url) ?: return false
