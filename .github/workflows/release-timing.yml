@@ -17,8 +17,8 @@ jobs:
       - nscloud-cache-tag-candy-release
     timeout-minutes: 90
     env:
-      SOURCE_REF: fab/v0.48.0-fab.4
-      INPUT_CHANGELOG: release-notes/0.48.0-fab.4.md
+      SOURCE_REF: fab/v0.48.0-fab.5
+      INPUT_CHANGELOG: release-notes/0.48.0-fab.5.md
       GRADLE_FLAGS: --build-cache
     steps:
       - name: Check out source
