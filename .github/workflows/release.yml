@@ -60,10 +60,17 @@ jobs:
           fetch-depth: 0
           fetch-tags: true
 
-      - name: Mount Gradle cache volume
+      - name: Mount Gradle and build caches
         uses: namespacelabs/nscloud-cache-action@1124a6f3ce44e5cf84cc22111530961f4d2a15f9 # v1.7.0
         with:
           cache: gradle
+          path: |
+            ${{ github.workspace }}/.gradle
+            ${{ github.workspace }}/build
+            ${{ github.workspace }}/app/build
+            ${{ github.workspace }}/shared/build
+            ${{ github.workspace }}/pocket-runtime/build
+            ${{ github.workspace }}/pocket-runtime/.cxx
 
       - name: Validate release metadata
         shell: bash
