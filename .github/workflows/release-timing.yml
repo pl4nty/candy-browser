@@ -17,9 +17,9 @@ jobs:
       - nscloud-cache-tag-candy-release
     timeout-minutes: 90
     env:
-      SOURCE_REF: fab/v0.48.0-fab.4
-      INPUT_CHANGELOG: release-notes/0.48.0-fab.4.md
-      GRADLE_FLAGS: --build-cache
+      SOURCE_REF: fab/v0.48.0-fab.5
+      INPUT_CHANGELOG: release-notes/0.48.0-fab.5.md
+      GRADLE_FLAGS: --build-cache --profile
     steps:
       - name: Check out source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -175,3 +175,14 @@ jobs:
           cp \
             "app/build/outputs/apk/full/release/app-full-release.apk" \
             "$RUNNER_TEMP/candy-standard-arm64-v8a-release.apk"
+
+      - name: Report build directory sizes
+        if: always()
+        run: du -sh ~/.gradle/caches .gradle build app/build shared/build pocket-runtime/build pocket-runtime/.cxx
+
+      - name: Upload Gradle profiles
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: gradle-profiles
+          path: build/reports/profile
