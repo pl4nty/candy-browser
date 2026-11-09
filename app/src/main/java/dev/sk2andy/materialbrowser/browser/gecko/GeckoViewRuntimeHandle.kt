@@ -1809,9 +1809,6 @@ private class GeckoViewBrowserSession(
                 ),
             ), { prompt.confirm(GeckoSession.PromptDelegate.SharePrompt.Result.ABORT) })
 
-            // Answer "no certificate" instead of dismissing. Gecko reads result.alias, so a
-            // dismissed (null) result throws and the TLS handshake never finishes; sites that send
-            // an optional CertificateRequest (www.commbank.com.au) then time out.
             override fun onRequestCertificate(
                 session: GeckoSession,
                 prompt: GeckoSession.PromptDelegate.CertificateRequest,
