@@ -1,0 +1,177 @@
+# TEMPORARY: times incremental release builds from build directories on the cache volume. Removed before merge.
+name: Release build cache timing
+
+on:
+  push:
+    branches: [claude/project-thread-ysg0m3]
+    paths: [.github/workflows/release-timing.yml]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Incremental release build
+    runs-on:
+      - nscloud-ubuntu-24.04-amd64-8x16-with-cache
+      - nscloud-cache-tag-candy-release
+    timeout-minutes: 90
+    env:
+      SOURCE_REF: fab/v0.48.0-fab.4
+      INPUT_CHANGELOG: release-notes/0.48.0-fab.4.md
+      GRADLE_FLAGS: --build-cache
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ env.SOURCE_REF }}
+
+      - name: Mount Gradle cache volume
+        uses: namespacelabs/nscloud-cache-action@1124a6f3ce44e5cf84cc22111530961f4d2a15f9 # v1.7.0
+        with:
+          cache: gradle
+          path: |
+            ${{ github.workspace }}/.gradle
+            ${{ github.workspace }}/build
+            ${{ github.workspace }}/app/build
+            ${{ github.workspace }}/shared/build
+            ${{ github.workspace }}/pocket-runtime/build
+            ${{ github.workspace }}/pocket-runtime/.cxx
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5.7.0
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@40fd30fb8d7440372e1316f5d1809ec01dcd3699 # v4.0.1
+        with:
+          packages: platform-tools
+
+      - name: Install Android SDK platform 37.1
+        shell: bash
+        run: sdkmanager "platforms;android-37.1"
+
+      - name: Create throwaway signing key
+        shell: bash
+        run: |
+          keytool -genkeypair -keystore "$RUNNER_TEMP/test.jks" -storepass timing-only \
+            -keypass timing-only -alias test -keyalg RSA -keysize 2048 -validity 1 -dname CN=test
+          {
+            echo "CANDY_RELEASE_KEYSTORE_PATH=$RUNNER_TEMP/test.jks"
+            echo "CANDY_RELEASE_STORE_PASSWORD=timing-only"
+            echo "CANDY_RELEASE_KEY_ALIAS=test"
+            echo "CANDY_RELEASE_KEY_PASSWORD=timing-only"
+          } >> "$GITHUB_ENV"
+
+      - name: Test and build signed release APKs
+        shell: bash
+        run: |
+          candy_owned_filter_sources=(
+            app/src/main/assets/blocked_hosts.txt
+            app/src/main/assets/candy_default_rules.txt
+            app/src/main/assets/cookie_banner_overrides.css
+            app/src/main/assets/first_party_family_allowed_host_pairs.txt
+            app/src/main/java/dev/sk2andy/materialbrowser/blocking/AdvancedFilterRules.kt
+            app/src/main/java/dev/sk2andy/materialbrowser/blocking/BundledBlockingSnapshot.kt
+            app/src/main/java/dev/sk2andy/materialbrowser/blocking/CandyRuleFormat.kt
+            app/src/main/java/dev/sk2andy/materialbrowser/blocking/EasyListCosmeticRules.kt
+            app/src/main/java/dev/sk2andy/materialbrowser/blocking/GenericCosmeticRuntime.kt
+            app/src/main/java/dev/sk2andy/materialbrowser/blocking/ProceduralCosmeticRules.kt
+            app/src/main/java/dev/sk2andy/materialbrowser/blocking/RequestBlocker.kt
+          )
+          candy_owned_filter_hashes="$(sha256sum "${candy_owned_filter_sources[@]}")"
+          python3 scripts/test_compile_easylist_hosts.py
+          python3 scripts/test_compile_easylist_cosmetic.py
+          python3 scripts/test_compile_hagezi_hosts.py
+          python3 scripts/test_compile_uassets_cosmetic.py
+          python3 scripts/test_compile_advanced_filters.py
+          python3 scripts/test_compile_procedural_cosmetic.py
+          python3 scripts/test_generate_gecko_default_extensions.py
+          python3 scripts/generate_gecko_default_extensions.py audit-remote
+          scripts/update_content_filter_hosts.sh
+          scripts/update_uassets_filters.sh
+          scripts/update_hagezi_hosts.sh
+          scripts/update_easylist_cosmetic.sh
+          if [[ "$(sha256sum "${candy_owned_filter_sources[@]}")" != \
+            "$candy_owned_filter_hashes" ]]; then
+            echo "Upstream filter generation modified Candy-owned filter sources." >&2
+            git diff -- "${candy_owned_filter_sources[@]}" >&2
+            exit 1
+          fi
+          git diff --exit-code -- \
+            app/src/main/assets/easylist_allowed_host_pairs.txt \
+            app/src/main/assets/easylist_blocked_hosts.txt \
+            app/src/main/assets/easylist_cosmetic_rules.txt \
+            app/src/main/assets/hagezi.LICENSE.txt \
+            app/src/main/assets/hagezi_blocked_hosts.txt
+          git diff --exit-code -- \
+            app/src/main/assets/uassets.LICENSE.txt \
+            app/src/main/assets/uassets_advanced_filters.txt \
+            app/src/main/assets/uassets_advanced_filters_source.txt \
+            app/src/main/assets/uassets_allowed_host_pairs.txt \
+            app/src/main/assets/uassets_blocked_host_pairs.txt \
+            app/src/main/assets/uassets_blocked_hosts.txt \
+            app/src/main/assets/uassets_cosmetic_rules.txt \
+            app/src/main/assets/uassets_procedural_cosmetic_rules.txt \
+            app/src/main/assets/uassets_filters_source.txt
+          ./gradlew --no-daemon $GRADLE_FLAGS --max-workers=2 \
+            "-Dorg.gradle.jvmargs=-Xmx4g -Dfile.encoding=UTF-8" \
+            -Pkotlin.daemon.jvmargs=-Xmx8g \
+            -Pcandy.releaseNotesFile="$INPUT_CHANGELOG" \
+            testFullDebugUnitTest \
+            testFossDebugUnitTest \
+            testSystemwebviewDebugUnitTest
+          ./gradlew --no-daemon $GRADLE_FLAGS --max-workers=2 \
+            "-Dorg.gradle.jvmargs=-Xmx4g -Dfile.encoding=UTF-8" \
+            -Pkotlin.daemon.jvmargs=-Xmx8g \
+            -Pcandy.releaseNotesFile="$INPUT_CHANGELOG" \
+            assembleFullRelease
+          ./gradlew --no-daemon $GRADLE_FLAGS --max-workers=2 \
+            "-Dorg.gradle.jvmargs=-Xmx4g -Dfile.encoding=UTF-8" \
+            -Pkotlin.daemon.jvmargs=-Xmx8g \
+            -Pcandy.releaseNotesFile="$INPUT_CHANGELOG" \
+            assembleFossRelease
+          ./gradlew --no-daemon $GRADLE_FLAGS --max-workers=2 \
+            "-Dorg.gradle.jvmargs=-Xmx4g -Dfile.encoding=UTF-8" \
+            -Pkotlin.daemon.jvmargs=-Xmx8g \
+            -Pcandy.releaseNotesFile="$INPUT_CHANGELOG" \
+            assembleSystemwebviewRelease
+          ./gradlew --no-daemon $GRADLE_FLAGS --max-workers=2 \
+            "-Dorg.gradle.jvmargs=-Xmx4g -Dfile.encoding=UTF-8" \
+            -Pkotlin.daemon.jvmargs=-Xmx8g \
+            -Pcandy.releaseNotesFile="$INPUT_CHANGELOG" \
+            assembleFullUserCaRelease
+          CANDY_STANDARD_APK="app/build/outputs/apk/full/release/app-full-release.apk" \
+            CANDY_FOSS_APK="app/build/outputs/apk/foss/release/app-foss-release.apk" \
+            CANDY_USER_CA_APK="app/build/outputs/apk/full/userCaRelease/app-full-userCaRelease.apk" \
+            CANDY_STANDARD_APPLICATION_ID="dev.sk2andy.materialbrowser" \
+            CANDY_FOSS_APPLICATION_ID="dev.sk2andy.materialbrowser.foss" \
+            CANDY_USER_CA_APPLICATION_ID="dev.sk2andy.materialbrowser.ca" \
+            CANDY_STANDARD_APP_LABEL="Candy Browser" \
+            CANDY_FOSS_APP_LABEL="Candy FOSS" \
+            CANDY_USER_CA_APP_LABEL="Candy CA" \
+            CANDY_STANDARD_LAUNCHER_FOREGROUND="drawable/ic_launcher_foreground" \
+            CANDY_FOSS_LAUNCHER_FOREGROUND="drawable/ic_launcher_foreground_foss" \
+            CANDY_USER_CA_LAUNCHER_FOREGROUND="drawable/ic_launcher_foreground_ca" \
+            CANDY_STANDARD_LAUNCHER_MONOCHROME="drawable/ic_launcher_monochrome" \
+            CANDY_FOSS_LAUNCHER_MONOCHROME="drawable/ic_launcher_monochrome_foss" \
+            CANDY_USER_CA_LAUNCHER_MONOCHROME="drawable/ic_launcher_monochrome_ca" \
+            python3 scripts/test_network_security_apks.py
+          cp \
+            "app/build/outputs/apk/full/release/app-full-release.apk" \
+            "$RUNNER_TEMP/candy-standard-universal-release.apk"
+          cp \
+            "app/build/outputs/apk/systemwebview/release/app-systemwebview-release.apk" \
+            "$RUNNER_TEMP/candy-systemwebview-release.apk"
+          ./gradlew --no-daemon $GRADLE_FLAGS --max-workers=2 \
+            "-Dorg.gradle.jvmargs=-Xmx4g -Dfile.encoding=UTF-8" \
+            -Pkotlin.daemon.jvmargs=-Xmx8g \
+            -Pcandy.releaseNotesFile="$INPUT_CHANGELOG" \
+            -Pcandy.releaseAbi=arm64-v8a \
+            -Pcandy.compressNativeLibs=true \
+            assembleFullRelease
+          cp \
+            "app/build/outputs/apk/full/release/app-full-release.apk" \
+            "$RUNNER_TEMP/candy-standard-arm64-v8a-release.apk"
