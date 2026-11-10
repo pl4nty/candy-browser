@@ -277,6 +277,7 @@ fun AddressLoadCapsuleFeedback(
                             bottomRightCornerRadius = outlineCornerRadius,
                             bottomLeftCornerRadius = outlineCornerRadius,
                         ),
+                        Path.Direction.Clockwise,
                     )
                 }
                 val pathMeasure = PathMeasure().apply {
@@ -297,7 +298,7 @@ fun AddressLoadCapsuleFeedback(
                     val loadBrush = when (style) {
                         BrowserAddressLoadStyle.Rainbow -> Brush.sweepGradient(
                             colors = AddressLoadRainbowRules.shiftedColors(
-                                activeMotion.travelPhase.value,
+                                1f - activeMotion.travelPhase.value,
                             ),
                             center = center,
                         )
