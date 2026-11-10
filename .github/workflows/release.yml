@@ -42,8 +42,11 @@ concurrency:
 jobs:
   release:
     name: Build and publish v${{ inputs.version }}
-    runs-on: ubuntu-latest
-    timeout-minutes: 60
+    # Namespace 8 vCPU / 16 GB: about 18 min with two Gradle workers, against 57 min on ubuntu-latest.
+    runs-on:
+      - nscloud-ubuntu-24.04-amd64-8x16-with-cache
+      - nscloud-cache-tag-candy-release
+    timeout-minutes: 90
     environment: release
     env:
       INPUT_VERSION: ${{ inputs.version }}
@@ -56,6 +59,18 @@ jobs:
         with:
           fetch-depth: 0
           fetch-tags: true
+
+      - name: Mount Gradle and build caches
+        uses: namespacelabs/nscloud-cache-action@1124a6f3ce44e5cf84cc22111530961f4d2a15f9 # v1.7.0
+        with:
+          cache: gradle
+          path: |
+            ${{ github.workspace }}/.gradle
+            ${{ github.workspace }}/build
+            ${{ github.workspace }}/app/build
+            ${{ github.workspace }}/shared/build
+            ${{ github.workspace }}/pocket-runtime/build
+            ${{ github.workspace }}/pocket-runtime/.cxx
 
       - name: Validate release metadata
         shell: bash
@@ -130,7 +145,6 @@ jobs:
         with:
           distribution: temurin
           java-version: "17"
-          cache: gradle
 
       - name: Set up Android SDK
         uses: android-actions/setup-android@40fd30fb8d7440372e1316f5d1809ec01dcd3699 # v4.0.1
@@ -252,21 +266,31 @@ jobs:
             app/src/main/assets/uassets_cosmetic_rules.txt \
             app/src/main/assets/uassets_procedural_cosmetic_rules.txt \
             app/src/main/assets/uassets_filters_source.txt
-          ./gradlew --no-daemon --max-workers=1 \
+          ./gradlew --no-daemon --build-cache --max-workers=2 \
+            "-Dorg.gradle.jvmargs=-Xmx4g -Dfile.encoding=UTF-8" \
+            -Pkotlin.daemon.jvmargs=-Xmx8g \
             -Pcandy.releaseNotesFile="$INPUT_CHANGELOG" \
             testFullDebugUnitTest \
             testFossDebugUnitTest \
             testSystemwebviewDebugUnitTest
-          ./gradlew --no-daemon --max-workers=1 \
+          ./gradlew --no-daemon --build-cache --max-workers=2 \
+            "-Dorg.gradle.jvmargs=-Xmx4g -Dfile.encoding=UTF-8" \
+            -Pkotlin.daemon.jvmargs=-Xmx8g \
             -Pcandy.releaseNotesFile="$INPUT_CHANGELOG" \
             assembleFullRelease
-          ./gradlew --no-daemon --max-workers=1 \
+          ./gradlew --no-daemon --build-cache --max-workers=2 \
+            "-Dorg.gradle.jvmargs=-Xmx4g -Dfile.encoding=UTF-8" \
+            -Pkotlin.daemon.jvmargs=-Xmx8g \
             -Pcandy.releaseNotesFile="$INPUT_CHANGELOG" \
             assembleFossRelease
-          ./gradlew --no-daemon --max-workers=1 \
+          ./gradlew --no-daemon --build-cache --max-workers=2 \
+            "-Dorg.gradle.jvmargs=-Xmx4g -Dfile.encoding=UTF-8" \
+            -Pkotlin.daemon.jvmargs=-Xmx8g \
             -Pcandy.releaseNotesFile="$INPUT_CHANGELOG" \
             assembleSystemwebviewRelease
-          ./gradlew --no-daemon --max-workers=1 \
+          ./gradlew --no-daemon --build-cache --max-workers=2 \
+            "-Dorg.gradle.jvmargs=-Xmx4g -Dfile.encoding=UTF-8" \
+            -Pkotlin.daemon.jvmargs=-Xmx8g \
             -Pcandy.releaseNotesFile="$INPUT_CHANGELOG" \
             assembleFullUserCaRelease
           CANDY_STANDARD_APK="app/build/outputs/apk/full/release/app-full-release.apk" \
@@ -291,7 +315,9 @@ jobs:
           cp \
             "app/build/outputs/apk/systemwebview/release/app-systemwebview-release.apk" \
             "$RUNNER_TEMP/candy-systemwebview-release.apk"
-          ./gradlew --no-daemon --max-workers=1 \
+          ./gradlew --no-daemon --build-cache --max-workers=2 \
+            "-Dorg.gradle.jvmargs=-Xmx4g -Dfile.encoding=UTF-8" \
+            -Pkotlin.daemon.jvmargs=-Xmx8g \
             -Pcandy.releaseNotesFile="$INPUT_CHANGELOG" \
             -Pcandy.releaseAbi=arm64-v8a \
             -Pcandy.compressNativeLibs=true \

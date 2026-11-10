@@ -890,6 +890,8 @@ class BrowserController(
         private set
     var isAddressBarSwipeModeEnabled by mutableStateOf(false)
         private set
+    var isFastActionButtonEnabled by mutableStateOf(false)
+        private set
     var isStartupAnimationEnabled by mutableStateOf(true)
         private set
     var startupAddressFocusMode by mutableStateOf(StartupAddressFocusMode.Default)
@@ -2852,6 +2854,7 @@ class BrowserController(
         addressBarActionLayout = store.loadAddressBarActionLayout()
         isFullImmersiveModeEnabled = store.loadFullImmersiveModeEnabled()
         isAddressBarSwipeModeEnabled = store.loadAddressBarSwipeModeEnabled()
+        isFastActionButtonEnabled = store.loadFastActionButtonEnabled()
         isStartupAnimationEnabled = store.loadStartupAnimationEnabled()
         startupAddressFocusMode = store.loadStartupAddressFocusMode()
         isHttpPasswordAutofillEnabled = store.loadHttpPasswordAutofillEnabled()
@@ -10775,6 +10778,12 @@ class BrowserController(
         store.saveAddressBarSwipeModeEnabled(enabled)
     }
 
+    fun updateFastActionButtonEnabled(enabled: Boolean) {
+        if (isFastActionButtonEnabled == enabled) return
+        isFastActionButtonEnabled = enabled
+        store.saveFastActionButtonEnabled(enabled)
+    }
+
     fun updateStartupAnimationEnabled(enabled: Boolean) {
         if (isStartupAnimationEnabled == enabled) return
         isStartupAnimationEnabled = enabled
@@ -11435,11 +11444,11 @@ class BrowserController(
         }
 
     fun setForceSafeArea(tabId: String, enabled: Boolean): Boolean =
-        updateSitePrivacyOverrides(tabId, reloadAffectedPages = false) { current, _ ->
+        updateSitePrivacyOverrides(tabId, reloadAffectedPages = false) { current, host ->
             current.copy(
                 forceSafeArea = SitePrivacyOverrideRules.overrideForSelection(
                     enabled = enabled,
-                    bundledDefault = false,
+                    bundledDefault = bundledSitePrivacyDefaults.forceSafeArea(host),
                 ),
             )
         }
@@ -18531,7 +18540,10 @@ class BrowserController(
         SitePrivacyOverrideRules.forcePageZooming(sitePrivacyOverridesFor(tab)[host])
 
     private fun isSafeAreaForced(tab: BrowserTab, host: String): Boolean =
-        SitePrivacyOverrideRules.forceSafeArea(sitePrivacyOverridesFor(tab)[host])
+        SitePrivacyOverrideRules.forceSafeArea(
+            overrides = sitePrivacyOverridesFor(tab)[host],
+            bundledDefault = bundledSitePrivacyDefaults.forceSafeArea(host),
+        )
 
     private fun isFederatedLoginCompatibilityEnabled(tab: BrowserTab, pageUrl: String?): Boolean {
         val host = PrivacyRequestSanitizer.webHost(pageUrl ?: tab.url) ?: return false

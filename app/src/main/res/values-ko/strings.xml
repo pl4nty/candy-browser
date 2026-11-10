@@ -591,6 +591,9 @@
     <string name="settings_address_bar_docking_title">주차된 주소 패블릿을 옮기세요</string>
     <string name="settings_address_bar_swipe_mode_title">스와이프로 주소 표시줄 전환</string>
     <string name="settings_address_bar_swipe_mode_summary">페이지에서 아래로 스와이프하면 주소 표시줄이 펼쳐지고 위로 스와이프하면 작아집니다. 스크롤할 수 없는 페이지에서도 작동합니다. 끄면 페이지 스크롤에 따라 바뀝니다.</string>
+    <string name="settings_fast_action_button_title">빠른 작업 버튼</string>
+    <string name="settings_fast_action_button_summary">주소 필을 숨깁니다. 버튼을 탭하면 주소를 편집하고, 길게 누른 채 밀면 작업, 최근 탭, 메뉴를 사용할 수 있습니다.</string>
+    <string name="cd_fast_action_button">빠른 작업</string>
     <string name="settings_address_bar_docking_subtitle">정지된 약을 당겨서 가장 가까운 화면 가장자리에 놓아주세요. 주소줄을 중앙에 놓지 않도록 끄세요.</string>
     <string name="settings_tab_dismiss_resistance">탭 방출 저항</string>
     <string name="settings_tab_dismiss_resistance_summary">저항 단계: %1$d%% 닫기 거리의</string>

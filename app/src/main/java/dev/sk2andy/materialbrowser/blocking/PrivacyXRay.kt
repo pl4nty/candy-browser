@@ -93,8 +93,8 @@ object SitePrivacyOverrideRules {
     fun forcePageZooming(overrides: SitePrivacyOverrides?): Boolean =
         overrides?.forcePageZooming ?: false
 
-    fun forceSafeArea(overrides: SitePrivacyOverrides?): Boolean =
-        overrides?.forceSafeArea ?: false
+    fun forceSafeArea(overrides: SitePrivacyOverrides?, bundledDefault: Boolean = false): Boolean =
+        overrides?.forceSafeArea ?: bundledDefault
 
     fun thirdPartyLoginAllowed(overrides: SitePrivacyOverrides?): Boolean =
         overrides?.thirdPartyLoginAllowed ?: false

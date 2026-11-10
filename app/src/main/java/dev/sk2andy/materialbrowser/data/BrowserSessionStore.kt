@@ -993,6 +993,13 @@ class BrowserSessionStore internal constructor(
         preferences.edit().putBoolean(KEY_ADDRESS_BAR_SWIPE_MODE_ENABLED, enabled).apply()
     }
 
+    fun loadFastActionButtonEnabled(): Boolean =
+        preferences.getBoolean(KEY_FAST_ACTION_BUTTON_ENABLED, false)
+
+    fun saveFastActionButtonEnabled(enabled: Boolean) {
+        preferences.edit().putBoolean(KEY_FAST_ACTION_BUTTON_ENABLED, enabled).apply()
+    }
+
     fun loadExternalLinkPreviewEnabled(): Boolean =
         preferences.getBoolean(KEY_EXTERNAL_LINK_PREVIEW_ENABLED, false)
 
@@ -1759,6 +1766,7 @@ class BrowserSessionStore internal constructor(
             "address_bar_dock_vertical_fraction"
         const val KEY_ADDRESS_BAR_DOCKING_ENABLED = "address_bar_docking_enabled"
         const val KEY_ADDRESS_BAR_SWIPE_MODE_ENABLED = "address_bar_swipe_mode_enabled"
+        const val KEY_FAST_ACTION_BUTTON_ENABLED = "fast_action_button_enabled"
         const val KEY_EXTERNAL_LINK_PREVIEW_ENABLED = "external_link_preview_enabled"
         const val KEY_EXTERNAL_LINK_PREVIEW_PROFILE_ID = "external_link_preview_profile_id"
         const val KEY_EXTERNAL_APP_LINK_HANDLING = "external_app_link_handling"
