@@ -26,7 +26,7 @@ internal object AddressBarPresentationRules {
 }
 internal object AddressBarControlRules {
     fun tabCountLabel(tabCount: Int): String =
-        if (tabCount > 99) "∞" else tabCount.coerceAtLeast(0).toString()
+        if (tabCount > 999) "∞" else tabCount.coerceAtLeast(0).toString()
 
     /**
      * @param startsFullWidth the bar was hidden before editing (the fast action button replaces
