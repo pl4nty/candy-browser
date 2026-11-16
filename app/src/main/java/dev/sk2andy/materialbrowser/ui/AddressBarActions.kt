@@ -39,6 +39,7 @@ import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import dev.sk2andy.materialbrowser.R
 import dev.sk2andy.materialbrowser.data.AddressBarAction
 
@@ -418,10 +419,16 @@ internal fun AddressBarTabCounterGlyph(
             .clearAndSetSemantics { },
         contentAlignment = Alignment.Center,
     ) {
+        val label = AddressBarControlRules.tabCountLabel(tabCount)
         Text(
-            text = AddressBarControlRules.tabCountLabel(tabCount),
-            style = MaterialTheme.typography.labelMedium,
+            text = label,
+            style = if (label.length > 2) {
+                MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp, letterSpacing = 0.sp)
+            } else {
+                MaterialTheme.typography.labelMedium
+            },
             fontWeight = FontWeight.SemiBold,
+            maxLines = 1,
         )
     }
 }

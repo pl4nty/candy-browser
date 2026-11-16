@@ -59,7 +59,7 @@ enum class BrowserTabsIntent {
 }
 
 object BrowserTabsRules {
-    private const val INFINITE_TAB_COUNT = 100
+    private const val INFINITE_TAB_COUNT = 1000
 
     fun countLabel(tabCount: Int): String = if (tabCount >= INFINITE_TAB_COUNT) {
         "∞"
