@@ -7,16 +7,18 @@ import org.junit.Test
 
 class AddressBarControlRulesTest {
     @Test
-    fun `tab counter shows exact count through ninety nine`() {
+    fun `tab counter shows exact count through nine hundred ninety nine`() {
         assertEquals("0", AddressBarControlRules.tabCountLabel(0))
         assertEquals("1", AddressBarControlRules.tabCountLabel(1))
         assertEquals("99", AddressBarControlRules.tabCountLabel(99))
+        assertEquals("100", AddressBarControlRules.tabCountLabel(100))
+        assertEquals("999", AddressBarControlRules.tabCountLabel(999))
     }
 
     @Test
-    fun `tab counter uses infinity above ninety nine`() {
-        assertEquals("∞", AddressBarControlRules.tabCountLabel(100))
-        assertEquals("∞", AddressBarControlRules.tabCountLabel(500))
+    fun `tab counter uses infinity above nine hundred ninety nine`() {
+        assertEquals("∞", AddressBarControlRules.tabCountLabel(1000))
+        assertEquals("∞", AddressBarControlRules.tabCountLabel(5000))
     }
 
     @Test
