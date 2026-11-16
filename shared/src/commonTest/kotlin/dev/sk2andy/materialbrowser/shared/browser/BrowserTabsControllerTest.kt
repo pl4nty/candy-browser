@@ -153,13 +153,18 @@ class BrowserTabsControllerTest {
     }
 
     @Test
-    fun `tab count becomes infinity at one hundred`() {
+    fun `tab count becomes infinity at one thousand`() {
         val controller = BrowserTabsController()
-        repeat(99) {
+        repeat(998) {
             controller.dispatch(BrowserTabsIntent.NewTab, tabId = null)
         }
 
-        assertEquals(100, controller.state.tabs.size)
+        assertEquals(999, controller.state.tabs.size)
+        assertEquals("999", controller.state.countLabel)
+
+        controller.dispatch(BrowserTabsIntent.NewTab, tabId = null)
+
+        assertEquals(1000, controller.state.tabs.size)
         assertEquals("∞", controller.state.countLabel)
     }
 
