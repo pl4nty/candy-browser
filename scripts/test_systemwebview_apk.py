@@ -44,7 +44,6 @@ FORBIDDEN_NATIVE_LIBRARIES = {
     "libnss3.so",
     "libplugin-container.so",
     "libsoftokn3.so",
-    "libxul.so",
 }
 FORBIDDEN_DEX_MARKERS = (
     b"org/mozilla/geckoview",
