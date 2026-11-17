@@ -734,6 +734,10 @@ configurations.configureEach {
     }
 }
 
+configurations.matching { it.name.startsWith("foss") }.configureEach {
+    exclude(group = "com.google.android.gms", module = "play-services-fido")
+}
+
 dependencies {
     implementation(project(":shared"))
     implementation(project(":pocket-runtime"))
@@ -770,9 +774,7 @@ dependencies {
     implementation("org.mozilla.telemetry:glean:70.3.0")
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.8.1")
     "fullImplementation"(geckoViewDependency)
-    "fossImplementation"(geckoViewDependency) {
-        exclude(group = "com.google.android.gms", module = "play-services-fido")
-    }
+    "fossImplementation"(geckoViewDependency)
     "systemwebviewCompileOnly"(geckoViewDependency)
     implementation(platform("androidx.compose:compose-bom:2025.05.01"))
     implementation("androidx.compose.foundation:foundation")
