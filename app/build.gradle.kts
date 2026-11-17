@@ -738,6 +738,10 @@ configurations.configureEach {
     }
 }
 
+configurations.matching { it.name.startsWith("foss") }.configureEach {
+    exclude(group = "com.google.android.gms", module = "play-services-fido")
+}
+
 dependencies {
     implementation(project(":shared"))
     implementation(project(":pocket-runtime"))
