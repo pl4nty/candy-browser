@@ -475,6 +475,11 @@
         return false;
       }
     }
+    fallBackToNativeHeader(element, style);
+    return true;
+  }
+
+  function fallBackToNativeHeader(element, style) {
     nativeFallbackRequested = true;
     nativeFallbackThemeColor = headerThemeColor(element, style);
     document.documentElement.setAttribute("data-candy-browser-native-top-header", "true");
@@ -484,7 +489,18 @@
       nativeFallbackThemeColor,
       true,
     );
-    return true;
+  }
+
+  // Gecko delivers env(safe-area-inset-top) without viewport-fit=cover, where
+  // Chrome and Safari resolve it to zero. A header that already uses it would
+  // receive the inset twice, so native margins must zero env() instead.
+  function usesNativeTopInset(element, style, top) {
+    const padding = rules.get(element)?.rule.style.getPropertyValue("padding-top") ? null : pixels(style.paddingTop);
+    const candidates = [top, padding].filter((value) => value !== null && Math.abs(value - inset) <= 1);
+    if (!candidates.length) return false;
+    const native = nativeTopInset();
+    return native !== null && native >= inset - 0.5 &&
+      candidates.some((value) => Math.abs(value - native) < 0.05);
   }
 
   function verifyFixedHeaderCandidates() {
@@ -981,6 +997,18 @@
       layer?.contains(node) || selectorLayer?.contains(node) || selectorBuild?.staging?.contains(node);
   }
 
+  function nativeTopInset() {
+    if (!coverEnvProbe?.isConnected) {
+      if (!document.body) return null;
+      coverEnvProbe = document.createElement("div");
+      coverEnvProbe.style.setProperty("position", "fixed");
+      coverEnvProbe.style.setProperty("visibility", "hidden");
+      coverEnvProbe.style.setProperty("padding-top", "env(safe-area-inset-top, 0px)");
+      document.body.appendChild(coverEnvProbe);
+    }
+    return pixels(getComputedStyle(coverEnvProbe).paddingTop);
+  }
+
   function watchCoverNativeInset() {
     const generation = ++coverEnvWatchGeneration;
     if (!configuration?.cover) {
@@ -993,13 +1021,7 @@
       return;
     }
     if (!document.body || !globalThis.requestAnimationFrame) return;
-    if (!coverEnvProbe?.isConnected) {
-      coverEnvProbe = document.createElement("div");
-      coverEnvProbe.style.setProperty("position", "fixed");
-      coverEnvProbe.style.setProperty("visibility", "hidden");
-      coverEnvProbe.style.setProperty("padding-top", "env(safe-area-inset-top, 0px)");
-      document.body.appendChild(coverEnvProbe);
-    }
+    nativeTopInset();
     const deadline = performance.now() + 3000;
     let lastNativeInset = null;
     let frames = 0;
@@ -1776,6 +1798,9 @@
         return;
       }
       applyRule(element, "top", `${top + inset}px`, refreshTop);
+    } else if (usesNativeTopInset(element, style, top)) {
+      if (refreshTop) releaseElementTop(element);
+      if (!nativeFallbackRequested) fallBackToNativeHeader(element, style);
     } else applyRule(element, "top", `${top + inset}px`, refreshTop);
   }
 
