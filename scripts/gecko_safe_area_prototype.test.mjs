@@ -1122,7 +1122,17 @@ test('viewport-cover sticky header gets a theme-color backdrop before scroll wit
   assert.deepEqual(f.fallbacks, []);
 });
 
-test('status backdrop requires an opaque theme color and a pinned header below the inset', () => {
+test('cover backdrop without theme-color uses the resolved header background', () => {
+  const f = fixture({ viewportContent: 'viewport-fit=cover' });
+  const header = f.element('sticky', '32px', 'header');
+  header.rect = { top: 32, left: 0, width: 800, height: 56, right: 800, bottom: 88 };
+  header.computed.backgroundColor = 'rgb(253, 253, 247)';
+  f.start();
+  assert.deepEqual(f.backdrops, [[1, 1, '#fdfdf7']]);
+  assert.deepEqual(f.fallbacks, []);
+});
+
+test('status backdrop requires an opaque color and a pinned header below the inset', () => {
   const noTheme = fixture({ viewportContent: 'viewport-fit=cover' });
   noTheme.element('sticky', '32px', 'header').rect =
     { top: 32, left: 0, width: 800, height: 56, right: 800, bottom: 88 };
@@ -1403,6 +1413,34 @@ test('disabling safe-area policy clears the reported status-bar backdrop', () =>
   f.flush();
   f.configure({ enabled: false, revision: 2 });
   assert.deepEqual(f.backdrops, [[1, 1, '#123456'], [1, 2, null]]);
+});
+
+test('native env() offsets without viewport-fit cover fall back instead of receiving the inset twice', () => {
+  const f = fixture();
+  const bar = f.element('fixed', 'auto');
+  bar.style.setProperty('top', 'env(safe-area-inset-top)');
+  bar.style.setProperty('padding-top', 'env(safe-area-inset-top)');
+  bar.computed.backgroundColor = 'rgb(160, 28, 37)';
+  bar.rect = { top: 32, left: 0, width: 800, height: 73, right: 800, bottom: 105 };
+  f.start();
+  assert.equal(f.computed(bar).top, '32px');
+  assert.deepEqual(f.fallbacks, [[1, 1, '#a01c25', true]]);
+
+  const padded = fixture();
+  const header = padded.element('fixed', '0px');
+  header.style.setProperty('padding-top', 'env(safe-area-inset-top, 0px)');
+  header.rect = { top: 0, left: 0, width: 800, height: 73, right: 800, bottom: 73 };
+  padded.start();
+  assert.equal(padded.computed(header).top, '0px');
+  assert.equal(padded.fallbacks.length, 1);
+
+  const unaware = fixture({ envTop: 0 });
+  const plain = unaware.element('fixed', 'auto');
+  plain.style.setProperty('top', 'env(safe-area-inset-top)');
+  plain.rect = { top: 0, left: 0, width: 800, height: 41, right: 800, bottom: 41 };
+  unaware.start();
+  assert.equal(unaware.computed(plain).top, '32px');
+  assert.deepEqual(unaware.fallbacks, []);
 });
 
 test('sticky headers switch immediately while fixed headers must remain pinned after scrolling', () => {
@@ -1763,7 +1801,7 @@ test('still-fixed surfaces regain one original inset after repeated fullscreen t
 });
 
 test('persistent body and finite fixed/sticky rules do not accumulate on authorized rechecks', () => {
-  const f = fixture(); f.body.style.setProperty('padding-top', '4px');
+  const f = fixture({ envTop: 0 }); f.body.style.setProperty('padding-top', '4px');
   f.config.addInsetToNegativeTop = true;
   const nodes = [];
   for (const position of ['fixed', 'sticky']) {
@@ -1794,7 +1832,7 @@ test('persistent body and finite fixed/sticky rules do not accumulate on authori
   const larger = fixture(); larger.body.style.setProperty('padding-top', '40px'); larger.start();
   larger.body.style.setProperty('padding-top', '0px'); larger.flush();
   assert.equal(larger.computed(larger.body).paddingTop, '40px', 'Larger captured body padding persists');
-  const fractional = fixture({ density: 3, nativeTop: 137, normalizePixels: true });
+  const fractional = fixture({ density: 3, nativeTop: 137, envTop: 0, normalizePixels: true });
   const equal = fractional.element('fixed', '45.6667px');
   const above = fractional.element('sticky', '45.6678px'); fractional.start();
   assert.equal(fractional.computed(equal).top, '91.3334px');
