@@ -1132,6 +1132,56 @@ test('cover backdrop without theme-color uses the resolved header background', (
   assert.deepEqual(f.fallbacks, []);
 });
 
+test('cover backdrop accepts a pinned header named by its class', () => {
+  const f = fixture({ viewportContent: 'viewport-fit=cover' });
+  const header = f.element('sticky', '0px', 'div');
+  header.className = 'site-header__container';
+  header.computed.backgroundColor = 'rgb(255, 255, 255)';
+  Object.defineProperty(header, 'rect', { get: () => {
+    const top = Number.parseFloat(f.computed(header).top);
+    return { top, left: 0, width: 800, height: 56, right: 800, bottom: top + 56 };
+  } });
+  f.start();
+  f.flush();
+  assert.equal(f.computed(header).top, '32px');
+  assert.deepEqual(f.backdrops, [[1, 1, '#ffffff']]);
+  f.body.setAttribute('class', 'scrolled');
+  f.mutate(f.body, 'class');
+  f.flush();
+  assert.deepEqual(f.backdrops, [[1, 1, '#ffffff']], 'A cover recheck keeps the moved header backdrop');
+  assert.deepEqual(f.fallbacks, []);
+});
+
+test('cover backdrop reaches a moved header after many earlier navigation elements', () => {
+  const f = fixture({ viewportContent: 'viewport-fit=cover' });
+  for (let index = 0; index < 30; index++) f.element('static', 'auto', 'nav');
+  const header = f.element('sticky', '0px', 'header');
+  header.computed.backgroundColor = 'rgb(255, 255, 255)';
+  Object.defineProperty(header, 'rect', { get: () => {
+    const top = Number.parseFloat(f.computed(header).top);
+    return { top, left: 0, width: 800, height: 56, right: 800, bottom: top + 56 };
+  } });
+  f.start();
+  f.flush();
+  assert.equal(f.computed(header).top, '32px');
+  assert.deepEqual(f.backdrops, [[1, 1, '#ffffff']]);
+});
+
+test('cover backdrop accepts a moved wrapper around a semantic header', () => {
+  const f = fixture({ viewportContent: 'viewport-fit=cover' });
+  const wrapper = f.element('fixed', '0px', 'div');
+  wrapper.append(f.element('static', 'auto', 'header'));
+  wrapper.computed.backgroundColor = 'rgb(255, 255, 255)';
+  Object.defineProperty(wrapper, 'rect', { get: () => {
+    const top = Number.parseFloat(f.computed(wrapper).top);
+    return { top, left: 0, width: 800, height: 56, right: 800, bottom: top + 56 };
+  } });
+  f.start();
+  f.flush();
+  assert.equal(f.computed(wrapper).top, '32px');
+  assert.deepEqual(f.backdrops, [[1, 1, '#ffffff']]);
+});
+
 test('status backdrop requires an opaque color and a pinned header below the inset', () => {
   const noTheme = fixture({ viewportContent: 'viewport-fit=cover' });
   noTheme.element('sticky', '32px', 'header').rect =

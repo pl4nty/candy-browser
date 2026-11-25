@@ -100,6 +100,7 @@
   let lastHeaderTopCheck = -Infinity;
   let headerTopMarker = "";
   let backdropPriorityCandidates = [];
+  const movedTopBars = new Set();
   let backdropActivationStates = new WeakMap();
   let coverLayoutMutationStates = new WeakMap();
   let coverLayoutPending = false;
@@ -551,7 +552,7 @@
     }
     const viewportWidth = Math.max(1, globalThis.innerWidth || document.documentElement.clientWidth || 0);
     const viewportHeight = Math.max(1, globalThis.innerHeight || document.documentElement.clientHeight || 0);
-    const candidates = [...backdropPriorityCandidates,
+    const candidates = [...backdropPriorityCandidates, ...movedTopBars,
       ...(globalThis.CandyRedditSafeArea?.headerCandidates?.() || []),
       ...semanticHeaderCandidates];
     const visited = new Set();
@@ -813,11 +814,13 @@
     }
   }
 
+  function isHeaderLike(element) {
+    return semanticHeaderCandidates.has(element) || element.matches(semanticHeaderSelector) ||
+      /(?:header|topbar|navbar|masthead)/i.test(`${element.id || ""} ${element.className || ""}`);
+  }
+
   function rememberTopCandidate(element) {
-    if (semanticHeaderCandidates.has(element) || element.matches(semanticHeaderSelector) ||
-        /(?:header|topbar|navbar|masthead)/i.test(`${element.id || ""} ${element.className || ""}`)) {
-      rememberHeaderTopCandidate(element);
-    }
+    if (isHeaderLike(element)) rememberHeaderTopCandidate(element);
     if (topCandidates.has(element) || topCandidates.size >= configuration.maxInitialElements) return;
     topCandidates.add(element);
     topMutationStates.set(element, `${element.getAttribute("class") || ""}\n${element.getAttribute("style") || ""}`);
@@ -1633,6 +1636,14 @@
     return element?.parentElement || element?.getRootNode?.().host || null;
   }
 
+  function rememberMovedTopBar(element, top) {
+    if (top > 0.5 || movedTopBars.has(element) ||
+        (!isHeaderLike(element) && !element.querySelector?.(semanticSelector))) return;
+    movedTopBars.add(element);
+    if (movedTopBars.size > maxBackdropPriorityCandidates) movedTopBars.delete(movedTopBars.values().next().value);
+    if (!statusBarBackdropHeaderConfirmed) statusBarBackdropPending = true;
+  }
+
   function rememberBackdropHeaderCandidate(candidate) {
     backdropPriorityCandidates = backdropPriorityCandidates.filter((element) => element !== candidate);
     backdropPriorityCandidates.push(candidate);
@@ -1795,10 +1806,14 @@
         return;
       }
       applyRule(element, "top", `${top + inset}px`, refreshTop);
+      rememberMovedTopBar(element, top);
     } else if (usesNativeTopInset(element, style, top)) {
       if (refreshTop) releaseElementTop(element);
       if (!nativeFallbackRequested) fallBackToNativeHeader(element, style);
-    } else applyRule(element, "top", `${top + inset}px`, refreshTop);
+    } else {
+      applyRule(element, "top", `${top + inset}px`, refreshTop);
+      rememberMovedTopBar(element, top);
+    }
   }
 
   function seedInitialDom() {
@@ -2081,6 +2096,7 @@
       if (!element.isConnected) forgetSideDrawer(element);
     }
     backdropPriorityCandidates = backdropPriorityCandidates.filter((element) => element.isConnected);
+    for (const element of movedTopBars) if (!element.isConnected) movedTopBars.delete(element);
     viewportOverlayCandidates = viewportOverlayCandidates.filter((element) => element.isConnected);
     for (const header of topBannerHeaders) {
       if (header.isConnected) continue;
@@ -2451,6 +2467,7 @@
       coverLayoutMutationStates = new WeakMap();
       backdropActivationStates = new WeakMap();
       backdropPriorityCandidates = [];
+      movedTopBars.clear();
       routeCoverSettlingUntil = routeChanged && cover ? performance.now() + 2000 : 0;
       routeCoverRechecks = 0;
     }
