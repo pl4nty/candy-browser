@@ -573,11 +573,8 @@
     watchThemeColorMedia();
     const themeColor = activeThemeColor();
     if (statusBarBackdropHeaderConfirmed) {
-      publishStatusBarBackdrop(themeColor);
-      return;
-    }
-    if (!themeColor) {
-      publishStatusBarBackdrop(null);
+      publishStatusBarBackdrop(themeColor ||
+        headerThemeColor(statusBarBackdropHeader, getComputedStyle(statusBarBackdropHeader)));
       return;
     }
     const viewportWidth = Math.max(1, globalThis.innerWidth || document.documentElement.clientWidth || 0);
@@ -607,7 +604,7 @@
         statusBarBackdropHeader = element;
         backdropPriorityCandidates = [];
         coverLayoutMutationStates.set(element, `class:${element.getAttribute("class") || ""}`);
-        publishStatusBarBackdrop(themeColor);
+        publishStatusBarBackdrop(themeColor || headerThemeColor(element, style));
         return;
       }
     }
