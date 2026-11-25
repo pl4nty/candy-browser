@@ -7,12 +7,14 @@ recorded in [Settings option map](settings-option-map.md).
 
 | Surface | Behavior | Owner |
 | --- | --- | --- |
-| Settings home | Existing shrink preview reveals the browser; a nonempty settings search clears first | `BrowserScreen`, `BrowserSettingsOverlay` |
+| Settings home | Existing shrink preview reveals the browser; search results fade with the gesture and a nonempty search clears first | `BrowserScreen`, `BrowserSettingsOverlay`, `SettingsScreen` |
 | Settings subpages | Only the current page shrinks; its parent settings page fills the background throughout the gesture. Cancellation restores the page, commit returns to its parent. | `SettingsBackRouter`, shared `SettingsRouter`, `NativeScreenBackHandler`, `SettingsBackRules` |
 | Nested settings | Theme details return to Theme & interface; browser details return to Browser behavior; Link routing returns to Web pages; action editors return to Gestures; Topping catalog returns to Toppings. An active search result returns directly to the preserved Settings search. | shared `SettingsNavigationRules`, `SettingsBackRules`, `SettingsScreen` |
 | Snoozed tabs | Default shrink, followed by the existing dismissal fade; rescheduling dialogs retain Back priority | `SnoozedTabsScreen`, `NativeScreenBackHandler` |
 | History and Favorites activity roots | Idle root Back delegates to Android's cross-activity preview. A pending write alone temporarily blocks activity dismissal. History publishes committed mutation results before dismissal; selection clearing stays local. | `HistoryActivity`, `FavoritesActivity`, `HistoryScreen`, `FavoritesScreen` |
+| Constellations activity root | Delegates Back to Android so the previous activity is previewed instead of the activity window background. | `ConstellationActivity`, `ConstellationScreen` |
 | Favorites folders | The current folder follows gesture progress; cancel keeps it, commit returns one folder level without finishing the activity. | `FavoritesScreen`, `NativeScreenBackHandler` |
+| Website widget editor | The crop editor follows gesture progress; cancellation preserves the editor and commit dismisses it unless saving. | `SiteWidgetCropEditor`, `NativeScreenBackHandler` |
 | Legacy RSS source detail | Retains the source list beneath the detail, animates entry/exit, and reveals the list during predictive Back. Root Back remains Android-owned. | `RssFeedsScreen`, `NativeScreenBackHandler` |
 | Feed catalog and release notes | Catalog retains its parent collection under the gesture; release notes reveal the existing browser. Both cancel without navigation and commit once. | `FeedsScreen`, `FeedCatalogScreen`, `ReleaseNotesScreen` |
 
@@ -38,7 +40,7 @@ collection after a committed or cancelled gesture.
 | Settings routing | Shared destination model, transition, home, controls and core pages; platform resources, icons, effects and persisted state stay adapters | `shared/src/commonMain/.../SettingsDestination.kt`, `shared/src/commonMain/.../ui/settings`, Android `ui/SettingsScreen.kt` adapters |
 | Android settings organization | Settings Home separates Browsing, Tabs, Gestures, Theme & interface, Extensions, Privacy & data, and About. Tabs and Gestures have distinct subpages; App icon and History & browser data have their own routes. Search catalog entries target the same pages. Related options use connected rounded groups, and dependent rows remain visible but disabled while their parent choice is inactive. | `ui/SettingsHomePage.kt`, `ui/SettingsSearchCatalog.kt`, `ui/SettingsScreen.kt`, `shared/ui/settings/SettingsComponents.kt` |
 | Android settings search | Memory-only search on Settings Home matches localized option titles, descriptions and destination context. Capability-filtered results open existing routes and highlight/scroll common controls into view. | `ui/SettingsSearchRules.kt`, `ui/SettingsSearchCatalog.kt`, `ui/SettingsSearchField.kt`, shared `SettingsSearchTarget.kt` |
-| Android app language | Settings → Browser → App language uses native language names and a Follow device language option. Android's `LocaleManager` owns persistence and synchronization with system app-language settings. The supported list comes from `res/xml/locales_config.xml`; all supported languages and localization checks are listed in [`app-languages.md`](app-languages.md). | `data/AppLanguagePreferences.kt`, `ui/AppLanguageSettings.kt`, `ui/BrowserSettingsOverlay.kt`, `res/values-*/strings.xml` |
+| Android app language | Settings → Browser → App language uses native language names and a Follow device language option. On Android 13+, Android's `LocaleManager` owns persistence and synchronization with system app-language settings. Android 12 follows the device language and hides this setting. The supported list comes from `res/xml/locales_config.xml`; all supported languages and localization checks are listed in [`app-languages.md`](app-languages.md). | `data/AppLanguagePreferences.kt`, `ui/AppLanguageSettings.kt`, `ui/BrowserSettingsOverlay.kt`, `res/values-*/strings.xml` |
 | Android app icon | Settings → App icon opens a scrollable list with an icon preview, localized name and radio button for each option. Tapping anywhere on a row switches one launcher alias at a time. Android's enabled component state persists the choice; MainActivity keeps external link and share filters. The artwork is recomposed from the user supplied Candy Browser icon overview for a centered, circular launcher mask. | `data/AppIconSelection.kt`, `ui/AppIconSettings.kt`, `AndroidManifest.xml`, `res/drawable-nodpi/ic_launcher_*_art.png` |
 | Language changes | MainActivity handles locale and layout-direction configuration updates without recreation, retaining open regular/private tabs and the current settings page. Localized Android resources refresh through the existing configuration dispatch; device-language changes apply when no app override is selected. | `MainActivity.kt`, `AndroidManifest.xml`, `AppLanguageSettingsInstrumentedTest`, `AppLanguagePreferencesInstrumentedTest` |
 | Player settings | Direct Settings → Player page for video autoplay, Candy Player mode and independent seek sliders; header and Android Back return to Settings Home. Browser no longer duplicates these controls; shared/iOS keeps the unavailable route disabled. | `ui/PlayerSettingsPage.kt`, `ui/InlineMediaPlayerSeekSlider.kt`, `SettingsDestination.Player`, `PlayerSettingsPageInstrumentedTest`, `PlayerSettingsNavigationInstrumentedTest` |
@@ -181,10 +183,9 @@ Frosted keeps three persisted controls together in its surface group. They remai
   onboarding, and release notes do not force the editor open. Explicit address-bar taps, hardware
   focus actions, and new-tab actions still focus the editor in every mode.
 - Open home page on startup is global and disabled by default. When enabled, normal cold and warm
-  launcher opens select a fresh blank tab while keeping restored tabs, except when address focus
-  on launch is set to Never: that choice preserves the last selected tab and keeps the keyboard
-  closed. An existing fresh regular
-  blank tab in the active profile is reused. External links, launcher shortcuts, Site Capsules, and
+  launcher opens select a fresh blank tab while keeping restored tabs. Address focus on launch
+  controls the keyboard independently. An existing fresh regular blank tab in the active profile
+  is reused. External links, launcher shortcuts, Site Capsules, and
   activity recreation keep their own destinations.
 - Unknown stored values fall back per field; one corrupt value does not discard valid choices.
 - Address-bar colors override only address chrome. Theme preserves the selected Material You, Candy,
@@ -323,8 +324,8 @@ Frosted keeps three persisted controls together in its surface group. They remai
   private decisions therefore remain session-private. This path does not inject JavaScript into the
   page. Mozilla fixed the synchronous audible `play()` permission race in Gecko 154
   ([bug 2049064](https://bugzilla.mozilla.org/show_bug.cgi?id=2049064)). The named immediate-playback
-  device regression is enabled and passes on GeckoView 157. Candy compiles the pinned GeckoView 157
-  against Android SDK 37.1 with AGP 9.4.0; see the [upgrade audit](../audits/geckoview-157-upgrade.md).
+  device regression was enabled and passed on GeckoView 157 with Android SDK 37.1 and AGP 9.4.0;
+  see the [upgrade audit](../audits/geckoview-157-upgrade.md).
 
 ## Address loading styles
 

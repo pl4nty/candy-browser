@@ -5,6 +5,7 @@ import dev.sk2andy.materialbrowser.browser.BrowserTab
 import dev.sk2andy.materialbrowser.browser.DEFAULT_BROWSER_PROFILE
 import dev.sk2andy.materialbrowser.browser.ProfileLockTrigger
 import dev.sk2andy.materialbrowser.browser.ProfileProtection
+import dev.sk2andy.materialbrowser.browser.SyncProvider
 import dev.sk2andy.materialbrowser.data.SnoozedTab
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -92,6 +93,18 @@ class BrowserProfileManagementRulesTest {
     }
 
     @Test
+    fun mozillaProfilesAreNotMoveTargetsAndBoundLocalProfilesCannotBeDeleted() {
+        val firefox = BrowserProfile("mozilla:desktop", "🦊", syncedDeviceId = "desktop", syncProvider = SyncProvider.Mozilla)
+        val linked = work.copy(linkedMozillaDeviceId = "local")
+        val controller = controller(listOf(tab("regular")), profiles = listOf(DEFAULT_BROWSER_PROFILE, linked, firefox))
+        val state = controller.state
+
+        assertFalse(BrowserProfileManagementRules.canDeleteProfile(state, "work"))
+        assertTrue(BrowserProfileManagementRules.moveTargets(state, "regular").none { it.id == firefox.id })
+        assertEquals(state, controller.moveTabToProfile("regular", firefox.id))
+    }
+
+    @Test
     fun deleteMovesOpenPinnedPrivateAndScheduledTabsToSafeLocalFallback() {
         val state = BrowserTabsState(
             tabs = listOf(tab("selected", "work").copy(isPrivate = true), tab("pin", "work").copy(isPinned = true), tab("normal")),
@@ -141,14 +154,16 @@ class BrowserProfileManagementRulesTest {
     }
 
     @Test
-    fun moveCannotExceedTabLimitWhenSourceNeedsReplacement() {
-        val tabs = listOf(tab("source")) + List(BrowserSessionPersistenceRules.MAX_TABS - 1) {
+    fun moveBeyondOneThousandTabsCreatesSourceReplacement() {
+        val tabs = listOf(tab("source")) + List(999) {
             tab("target-$it", "work")
         }
         val controller = controller(tabs)
-        val before = controller.state
-        assertTrue(BrowserProfileManagementRules.moveTargets(before, "source").isEmpty())
-        assertEquals(before, controller.moveTabToProfile("source", "work"))
+        assertEquals(listOf(work), BrowserProfileManagementRules.moveTargets(controller.state, "source"))
+        val moved = controller.moveTabToProfile("source", "work")
+        assertEquals(1_001, moved.tabs.size)
+        assertEquals("work", moved.tabs.single { it.id == "source" }.profileId)
+        assertEquals("candy", moved.tabs.single { it.id == moved.selectedTabId }.profileId)
     }
 
     @Test

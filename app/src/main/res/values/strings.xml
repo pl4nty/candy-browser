@@ -542,6 +542,7 @@
     <string name="tab_lifetime_never">Never</string>
     <string name="tab_lifetime_immediately">When Candy enters background</string>
     <string name="tab_lifetime_when_app_closes">When Candy closes</string>
+    <string name="tab_lifetime_thirty_minutes">After 30 minutes</string>
     <plurals name="tab_lifetime_hours">
         <item quantity="one">After %1$d hour</item>
         <item quantity="other">After %1$d hours</item>
@@ -583,6 +584,7 @@
     <string name="external_app_prompt_confirm">Open</string>
     <string name="external_app_prompt_fallback_destination">this link</string>
     <string name="settings_http_password_autofill_title">Password manager on HTTP sites</string>
+    <string name="settings_http_password_autofill_android_summary">GeckoView: Password manager selection on HTTP sites requires Android 14 or later.</string>
     <string name="settings_http_password_autofill_gecko_summary">GeckoView only: After you tap a login field, Candy may open your default Android password manager. No automatic filling or saving on HTTP.</string>
     <string name="settings_http_password_autofill_system_webview_summary">Android System WebView: Unsupported. Its public API cannot enable password-manager selection on HTTP sites. Switch to GeckoView or use HTTPS.</string>
     <string name="settings_http_password_autofill_warning">HTTP sends usernames and passwords without transport encryption. Anyone able to intercept the connection can read them.</string>
@@ -1614,4 +1616,14 @@
     <string name="form_drafts_restore_failed">No matching empty field found. Saved text stays available until it expires.</string>
     <string name="form_drafts_settings_summary">Keep unsent multiline text encrypted on this device for 24 hours. Private drafts stay in memory until the tab closes. Sensitive fields are excluded. Turning this off deletes all drafts.</string>
     <string name="form_drafts_settings_title">Rescue form drafts</string>
+    <string name="settings_home_pages_title" tools:ignore="MissingTranslation">Home and new tabs</string>
+    <string name="settings_home_pages_summary" tools:ignore="MissingTranslation">Choose separate website addresses or the internal start page</string>
+    <string name="settings_home_pages_help" tools:ignore="MissingTranslation">Set each destination independently. Leave a field empty to keep Candy’s internal start page. New private tabs always use the internal start page.</string>
+    <string name="settings_home_button_url" tools:ignore="MissingTranslation">Home button URL</string>
+    <string name="settings_new_tab_url" tools:ignore="MissingTranslation">New tab URL</string>
+    <string name="settings_home_pages_copy" tools:ignore="MissingTranslation">Copy Home URL to new tabs</string>
+    <string name="settings_home_pages_reset" tools:ignore="MissingTranslation">Use internal start page for both</string>
+    <string name="settings_home_pages_internal" tools:ignore="MissingTranslation">Internal start page</string>
+    <string name="settings_home_pages_empty" tools:ignore="MissingTranslation">Empty = internal start page</string>
+    <string name="settings_home_pages_invalid" tools:ignore="MissingTranslation">Enter a valid HTTP or HTTPS website address.</string>
 </resources>

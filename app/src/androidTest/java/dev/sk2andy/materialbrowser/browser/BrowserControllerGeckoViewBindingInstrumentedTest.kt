@@ -32,6 +32,9 @@ import dev.sk2andy.materialbrowser.browser.gecko.GeckoPrivacyBindingHandshake
 import dev.sk2andy.materialbrowser.browser.gecko.GeckoPrivacyBindingHandshakeRules
 import dev.sk2andy.materialbrowser.browser.gecko.GeckoPrivacyEvent
 import dev.sk2andy.materialbrowser.browser.gecko.GeckoPrivacyPolicy
+import dev.sk2andy.materialbrowser.browser.gecko.GeckoViewInsetHost
+import dev.sk2andy.materialbrowser.browser.gecko.GeckoViewInsetLayout
+import dev.sk2andy.materialbrowser.browser.gecko.GeckoViewInsets
 import dev.sk2andy.materialbrowser.browser.integration.ExternalAppLauncher
 import dev.sk2andy.materialbrowser.shared.browser.BrowserEngineCommand
 import dev.sk2andy.materialbrowser.shared.browser.BrowserEngineCommands
@@ -71,6 +74,7 @@ class BrowserControllerGeckoViewBindingInstrumentedTest {
 
     private var controller: BrowserController? = null
     private var originalEngineKind: AndroidBrowserEngineKind? = null
+    private var originalFullImmersiveModeEnabled: Boolean? = null
     private var originalProfiles: Pair<List<BrowserProfile>, String>? = null
     private var originalProfilesEnabled: Boolean? = null
     private var originalHistory: List<HistoryEntry>? = null
@@ -743,6 +747,35 @@ class BrowserControllerGeckoViewBindingInstrumentedTest {
     }
 
     @Test
+    fun upwardScrollRestoresAutoParkedAddressBarOnlyWhenControlIsClear() {
+        lateinit var session: ReentrantAttachSession
+        composeRule.runOnIdle {
+            session = startAddressBarAutoDockSession(
+                probeResults = listOf(
+                    TextInputOcclusionProbeResult.Occluded,
+                    TextInputOcclusionProbeResult.Occluded,
+                    TextInputOcclusionProbeResult.NoFocusedTextInput,
+                ),
+            )
+        }
+        composeRule.waitUntil(timeoutMillis = 5_000L) {
+            requireNotNull(controller).isAddressBarDocked
+        }
+        composeRule.runOnIdle { session.emitScroll(500) }
+        composeRule.waitForIdle()
+        composeRule.runOnIdle { session.emitScroll(400) }
+        composeRule.waitUntil(timeoutMillis = 5_000L) { session.textInputOcclusionProbeCount == 2 }
+        composeRule.runOnIdle {
+            assertTrue(requireNotNull(controller).isAddressBarDocked)
+            session.emitScroll(300)
+        }
+        composeRule.waitUntil(timeoutMillis = 5_000L) {
+            session.textInputOcclusionProbeCount == 3 &&
+                !requireNotNull(controller).isAddressBarDocked
+        }
+    }
+
+    @Test
     fun latePageControlParksAddressBarWithoutIme() {
         lateinit var session: ReentrantAttachSession
         composeRule.runOnIdle {
@@ -1288,6 +1321,87 @@ class BrowserControllerGeckoViewBindingInstrumentedTest {
     }
 
     @Test
+    fun immersiveModeClearsSafeAreaWithUnchangedCutoutAndPreservesKeyboardInset() {
+        composeRule.runOnIdle {
+            val activity = composeRule.activity
+            val store = BrowserSessionStore(activity)
+            originalEngineKind = store.loadAndroidBrowserEngineKind()
+            originalFullImmersiveModeEnabled = store.loadFullImmersiveModeEnabled()
+            store.saveFullImmersiveModeEnabled(false)
+            if (!BuildConfig.SYSTEM_WEBVIEW_ONLY) {
+                assertTrue(store.saveAndroidBrowserEngineKind(AndroidBrowserEngineKind.GeckoView))
+            }
+            val browserController = BrowserController(activity)
+            controller = browserController
+            val originalDeveloperSettings = browserController.developerSettings
+            try {
+                browserController.updateDeveloperSettings(DeveloperSettings())
+                val session = ReentrantAttachSession(
+                    tabId = browserController.selectedTabId,
+                    onFirstAttach = {},
+                )
+                browserController.installGeckoEngineSessionForTesting(session)
+                val host = FrameLayout(activity)
+                activity.addContentView(host, matchParentLayoutParams())
+                browserController.attachSelectedBrowserEngineView(host)
+                browserController.dispatchGeckoEngineEventForTesting(
+                    BrowserEngineEvent(
+                        tabId = session.tabId,
+                        type = BrowserEngineEventType.NavigationStarted,
+                        address = "https://immersive.test/",
+                        title = null,
+                        canGoBack = false,
+                        canGoForward = false,
+                        failureDescription = null,
+                    ),
+                )
+                browserController.onWindowInsetsChanged(
+                    WindowInsetsCompat.Builder()
+                        .setInsets(WindowInsetsCompat.Type.displayCutout(), Insets.of(12, 96, 16, 24))
+                        .setInsets(WindowInsetsCompat.Type.ime(), Insets.of(0, 0, 0, 600))
+                        .setVisible(WindowInsetsCompat.Type.ime(), true)
+                        .build(),
+                )
+                assertEquals(96, session.privacyPolicies.last().cssSafeAreaTopInsetPx)
+                session.commands.clear()
+                val keyboardBottom = if (browserController.usesGeckoEngine) 600 else 0
+
+                browserController.updateFullImmersiveModeEnabled(true)
+
+                assertEquals(0, session.privacyPolicies.last().cssSafeAreaTopInsetPx)
+                assertEquals(GeckoViewInsets.Zero, session.insetLayouts.last().rendererSafeAreaOverride)
+                assertEquals(
+                    GeckoViewInsets(0, 0, 0, keyboardBottom),
+                    session.insetLayouts.last().margins,
+                )
+
+                browserController.updateFullImmersiveModeEnabled(false)
+
+                assertEquals(96, session.privacyPolicies.last().cssSafeAreaTopInsetPx)
+                browserController.updateDeveloperSettings(DeveloperSettings(forceSafeAreaFallback = true))
+                assertEquals(96, browserController.previewTopInsetPx(session.tabId))
+                assertEquals(96, session.insetLayouts.last().margins.top)
+
+                browserController.updateFullImmersiveModeEnabled(true)
+
+                assertEquals(0, browserController.previewTopInsetPx(session.tabId))
+                assertEquals(
+                    GeckoViewInsets(0, 0, 0, keyboardBottom),
+                    session.insetLayouts.last().margins,
+                )
+
+                browserController.updateFullImmersiveModeEnabled(false)
+
+                assertEquals(96, browserController.previewTopInsetPx(session.tabId))
+                assertEquals(96, session.insetLayouts.last().margins.top)
+                assertTrue(session.commands.isEmpty())
+            } finally {
+                browserController.updateDeveloperSettings(originalDeveloperSettings)
+            }
+        }
+    }
+
+    @Test
     fun developerSafeAreaFallbackForcesNativePreviewInset() {
         composeRule.runOnIdle {
             val browserController = BrowserController(composeRule.activity)
@@ -1326,6 +1440,7 @@ class BrowserControllerGeckoViewBindingInstrumentedTest {
                     store.saveProfiles(profiles, activeProfileId)
                 }
                 originalProfilesEnabled?.let(store::saveProfilesEnabled)
+                originalFullImmersiveModeEnabled?.let(store::saveFullImmersiveModeEnabled)
                 originalHistoryRecordingMode?.let { mode ->
                     assertTrue(store.saveHistoryRecordingMode(mode))
                 }
@@ -3342,6 +3457,56 @@ class BrowserControllerGeckoViewBindingInstrumentedTest {
     }
 
     @Test
+    fun typedWebAddressSurvivesStoppedPageStartingDuringAppLookup() {
+        assertTypedWebAddressSurvivesStoppedPage(appAvailable = false)
+    }
+
+    @Test
+    fun typedWebAddressOpensAppAfterStoppedPageStarts() {
+        assertTypedWebAddressSurvivesStoppedPage(appAvailable = true)
+    }
+
+    private fun assertTypedWebAddressSurvivesStoppedPage(appAvailable: Boolean) {
+        val started = CountDownLatch(1)
+        val release = CountDownLatch(1)
+        val fixture = composeRule.runOnIdle {
+            createAddressAppFixture(appAvailable = appAvailable, onLookup = {
+                started.countDown()
+                check(release.await(10, TimeUnit.SECONDS)) { "Address app lookup was not released" }
+            }).also {
+                it.browser.submitAddress("https://previous.candy.test/")
+                requireNotNull(it.session).commands.clear()
+            }
+        }
+        try {
+            composeRule.runOnIdle { fixture.browser.submitAddressFromAddressBar("paypal.de") }
+            assertTrue("Address app lookup did not start", started.await(5, TimeUnit.SECONDS))
+            composeRule.runOnIdle {
+                dispatchSiteDataNavigation(
+                    browserController = fixture.browser,
+                    tabId = fixture.browser.selectedTabId,
+                    type = BrowserEngineEventType.NavigationStarted,
+                    address = "https://previous.candy.test/",
+                )
+            }
+        } finally {
+            release.countDown()
+        }
+        awaitAddressAppLookup(fixture.browser)
+        composeRule.runOnIdle {
+            val loads = requireNotNull(fixture.session).commands
+                .filter { it.type == BrowserEngineCommandType.Load }.map { it.address }
+            if (appAvailable) {
+                assertEquals("https://paypal.de/", fixture.context.lastIntent?.dataString)
+                assertTrue(loads.isEmpty())
+            } else {
+                assertNull(fixture.context.lastIntent)
+                assertEquals(listOf("https://paypal.de"), loads)
+            }
+        }
+    }
+
+    @Test
     fun typedWebAddressLookupCannotLaunchAfterNewerBrowserNavigation() {
         val started = CountDownLatch(1)
         val release = CountDownLatch(1)
@@ -3363,6 +3528,53 @@ class BrowserControllerGeckoViewBindingInstrumentedTest {
             assertNull(fixture.context.lastIntent)
             assertEquals("https://newer.candy.test/", fixture.browser.selectedTab.url)
         }
+    }
+
+    @Test
+    fun typedWebAddressLookupCannotLaunchAfterNewerEngineRequest() {
+        assertNewerEngineNavigationCancelsAddressLookup(newRequest = true)
+    }
+
+    @Test
+    fun typedWebAddressLookupCannotLaunchAfterSourcePageChanges() {
+        assertNewerEngineNavigationCancelsAddressLookup(newRequest = false)
+    }
+
+    private fun assertNewerEngineNavigationCancelsAddressLookup(newRequest: Boolean) {
+        val started = CountDownLatch(1)
+        val release = CountDownLatch(1)
+        val fixture = composeRule.runOnIdle {
+            createAddressAppFixture(onLookup = {
+                started.countDown()
+                check(release.await(10, TimeUnit.SECONDS)) { "Address app lookup was not released" }
+            }).also { it.browser.submitAddress("https://previous.candy.test/") }
+        }
+        try {
+            composeRule.runOnIdle { fixture.browser.submitAddressFromAddressBar("github.com") }
+            assertTrue("Address app lookup did not start", started.await(5, TimeUnit.SECONDS))
+            composeRule.runOnIdle {
+                dispatchSiteDataNavigation(
+                    browserController = fixture.browser,
+                    tabId = fixture.browser.selectedTabId,
+                    type = BrowserEngineEventType.NavigationStarted,
+                    address = if (newRequest) "https://previous.candy.test/" else "https://newer.candy.test/",
+                )
+                if (newRequest) {
+                    fixture.browser.dispatchSelectedGeckoNavigationRequestForTesting(
+                        GeckoMainFrameNavigationRequest(
+                            url = "https://previous.candy.test/",
+                            isRedirect = false,
+                            hasUserGesture = false,
+                            isDirectNavigation = false,
+                        ),
+                    )
+                }
+            }
+        } finally {
+            release.countDown()
+        }
+        awaitAddressAppLookup(fixture.browser)
+        composeRule.runOnIdle { assertNull(fixture.context.lastIntent) }
     }
 
     @Test
@@ -4825,6 +5037,7 @@ class BrowserControllerGeckoViewBindingInstrumentedTest {
         val siteDataUrls = mutableListOf<String>()
         private var siteDataCompletion: ((Boolean) -> Unit)? = null
         val privacyPolicies = mutableListOf<GeckoPrivacyPolicy>()
+        val insetLayouts = mutableListOf<GeckoViewInsetLayout>()
         val activeStates = mutableListOf<Boolean>()
         val inlineVideoPresentationRequests = mutableListOf<Pair<GeckoInlineVideoIdentity?, Boolean>>()
         var deferPolicyReadyCallbacks = false
@@ -4870,7 +5083,11 @@ class BrowserControllerGeckoViewBindingInstrumentedTest {
         override fun createView(context: Context): View {
             check(createdView == null) { "Gecko session already has a bound View" }
             createCount++
-            return object : View(context) {
+            return object : View(context), GeckoViewInsetHost {
+                override fun updateInsets(layout: GeckoViewInsetLayout, windowInsets: WindowInsetsCompat) {
+                    insetLayouts += layout
+                }
+
                 override fun onAttachedToWindow() {
                     super.onAttachedToWindow()
                     if (attachDispatched) return
@@ -4959,7 +5176,15 @@ class BrowserControllerGeckoViewBindingInstrumentedTest {
             callback(accepted)
         }
 
-        override fun setScrollListener(listener: BrowserEngineScrollListener?) = Unit
+        private var scrollListener: BrowserEngineScrollListener? = null
+
+        override fun setScrollListener(listener: BrowserEngineScrollListener?) {
+            scrollListener = listener
+        }
+
+        fun emitScroll(scrollY: Int) {
+            scrollListener?.onScrollChanged(BrowserEngineScrollEvent(scrollYPx = scrollY))
+        }
 
         override fun setContentTargetListener(listener: BrowserContentTargetListener?) = Unit
 

@@ -503,6 +503,7 @@
     <string name="tab_lifetime_never">Nie</string>
     <string name="tab_lifetime_immediately">Wenn Candy in den Hintergrund geht</string>
     <string name="tab_lifetime_when_app_closes">Wenn Candy geschlossen wird</string>
+    <string name="tab_lifetime_thirty_minutes">Nach 30 Minuten</string>
     <plurals name="tab_lifetime_hours">
         <item quantity="one">Nach %1$d Stunde</item>
         <item quantity="other">Nach %1$d Stunden</item>
@@ -544,6 +545,7 @@
     <string name="external_app_prompt_confirm">Öffnen</string>
     <string name="external_app_prompt_fallback_destination">diesen Link</string>
     <string name="settings_http_password_autofill_title">Passwortmanager auf HTTP-Seiten</string>
+    <string name="settings_http_password_autofill_android_summary">GeckoView: Die Passwortmanager-Auswahl auf HTTP-Seiten benötigt Android 14 oder neuer.</string>
     <string name="settings_http_password_autofill_gecko_summary">Nur GeckoView: Nach Tippen auf ein Anmeldefeld darf Candy deinen Standard-Passwortmanager öffnen. Kein automatisches Ausfüllen oder Speichern auf HTTP.</string>
     <string name="settings_http_password_autofill_system_webview_summary">Android System WebView: Nicht unterstützt. Dessen öffentliche API kann die Passwortmanager-Auswahl auf HTTP-Seiten nicht freischalten. Wechsle zu GeckoView oder HTTPS.</string>
     <string name="settings_http_password_autofill_warning">HTTP überträgt Benutzernamen und Passwörter ohne Transportverschlüsselung. Wer die Verbindung abhören kann, kann sie lesen.</string>
@@ -1596,4 +1598,14 @@
     <string name="form_drafts_restore_failed">Kein passendes leeres Feld gefunden. Gespeicherter Text bleibt bis zum Ablauf verfügbar.</string>
     <string name="form_drafts_settings_summary">Nicht gesendeten mehrzeiligen Text für 24 Stunden verschlüsselt auf diesem Gerät behalten. Private Entwürfe bleiben bis zum Schließen des Tabs nur im Arbeitsspeicher. Sensible Felder sind ausgeschlossen. Ausschalten löscht alle Entwürfe.</string>
     <string name="form_drafts_settings_title">Formularentwürfe retten</string>
+    <string name="settings_home_pages_title">Startseite und neue Tabs</string>
+    <string name="settings_home_pages_summary">Separate Webadressen oder die interne Startseite wählen</string>
+    <string name="settings_home_pages_help">Beide Ziele sind unabhängig. Ein leeres Feld behält Candys interne Startseite bei. Neue private Tabs verwenden immer die interne Startseite.</string>
+    <string name="settings_home_button_url">URL für den Home-Button</string>
+    <string name="settings_new_tab_url">URL für neue Tabs</string>
+    <string name="settings_home_pages_copy">Home-URL für neue Tabs übernehmen</string>
+    <string name="settings_home_pages_reset">Für beide die interne Startseite verwenden</string>
+    <string name="settings_home_pages_internal">Interne Startseite</string>
+    <string name="settings_home_pages_empty">Leer = interne Startseite</string>
+    <string name="settings_home_pages_invalid">Eine gültige HTTP- oder HTTPS-Webadresse eingeben.</string>
 </resources>

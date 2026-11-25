@@ -1,7 +1,7 @@
 # Toppings (local userscripts)
 
 Toppings are the cross-platform lightweight customization model. Android's Gecko runtime uses a
-private bundled MV3 host extension. Android has no WebView fallback.
+private bundled MV3 host extension; Android System WebView uses its isolated-world runtime.
 The iOS runtime consumes the shared metadata and URL policy, resolves dependencies during explicit
 imports and installs each script as a scoped `WKUserScript` in a named `WKContentWorld`. Android Gecko separately
 supports Mozilla-signed Firefox WebExtensions. See [`platform-engines.md`](platform-engines.md) for
@@ -18,6 +18,20 @@ none of those privileged delegates are exposed to Toppings.
 | Persistence | Atomically store validated local source, bounded per-script GM values and the last valid catalog outside browser-session state | `data/UserScriptStore.kt`, `data/UserScriptValueStore.kt`, `data/ToppingCatalogStore.kt` |
 | Runtime | Register isolated scripts in regular Gecko sessions through the bundled Candy host; iOS uses its platform WKContentWorld bridge | `browser/gecko/GeckoToppingHostRuntime.kt`, `browser/BrowserController.kt`, `iosApp/CandyIos/ToppingRuntime.swift` |
 | UI and import | Manage local Toppings and explicitly install catalog entries | `ui/UserscriptManagementScreen.kt`, `ui/ToppingCatalogScreen.kt` |
+
+## Greasy Fork installation
+
+This experimental feature labels the installation dialog accordingly. Following a Greasy Fork
+install link in a regular Android tab downloads its bounded HTTPS source
+through the existing dependency client. Candy validates the source and shows its name, URL scopes,
+grants, dependencies and source code before the user explicitly installs it. Unsupported metadata
+or APIs are rejected. The installed Topping is shared by regular profiles and both Android engines;
+private tabs cannot start an installation and never run Toppings. The existing dependency host and
+redirect restrictions apply. Scripts are not updated automatically; an identical installed source
+is re-enabled instead of duplicated. Install links are intercepted after a user gesture or from a Greasy Fork page, whose own
+installation JavaScript may delay navigation until the gesture is no longer reported.
+On first use, Greasy Fork may first display its own userscript-manager instructions; choosing its
+option to continue with an existing manager proceeds to Candy's confirmation.
 
 ## Discovery catalog
 
@@ -53,7 +67,7 @@ none of those privileged delegates are exposed to Toppings.
 | `@grant GM_addStyle` or `GM.addStyle` | Adds a style element to the matching document |
 | Value grants | `GM_getValue`/`GM.getValue`, `GM_setValue`/`GM.setValue`, `GM_deleteValue`/`GM.deleteValue` and `GM_listValues`/`GM.listValues` enable bounded persistent JSON values isolated by script ID; legacy synchronous and `GM.*` Promise forms are available |
 | Menu grants | `GM_registerMenuCommand`/`GM.registerMenuCommand` and unregister variants add document-bound actions to the browser menu; callbacks remain inside the script's isolated world |
-| `GM_openInTab` / `GM.openInTab` | Opens a validated HTTP(S) URL in a regular foreground or background tab; private sources and non-web schemes are rejected |
+| `GM_openInTab` / `GM.openInTab` | Opens a validated HTTP(S) URL in a regular foreground or background tab; Boolean `true` means background, Boolean `false` foreground, and object `active` controls focus directly; private sources and non-web schemes are rejected |
 | `@require` | HTTPS JavaScript is fetched only during explicit import, install or update, bounded, optionally checked with a `#sha256=<hex>` fragment, stored locally and executed in metadata order before the main source |
 | `@resource` | Bounded HTTPS binary data is bundled locally; `GM_getResourceText`/`GM.getResourceText` and `GM_getResourceURL`/`GM.getResourceUrl` expose it without page-load network access |
 | `@updateURL`, `@downloadURL` | Accepted as inert metadata; Candy never updates scripts implicitly |
@@ -156,6 +170,7 @@ none of those privileged delegates are exposed to Toppings.
 | Settings semantics and actions | `UserscriptManagementScreenInstrumentedTest` |
 | Catalog schema, integrity and cache | `ToppingCatalogParserTest`, `ToppingVerifierTest`, `ToppingCatalogStoreInstrumentedTest` |
 | Discovery semantics and actions | `ToppingCatalogScreenInstrumentedTest` |
+| Greasy Fork URL, download and confirmation | `GreasyForkInstallTest`, `GreasyForkInstallDialogInstrumentedTest`, `BrowserControllerGreasyForkInstrumentedTest` |
 | WebView URL/frame guard and document-scoped bridge lifecycle | `UserScriptInjectionTest`, `UserScriptApiTest`, `UserScriptBridgeContractTest` |
 | Shared iOS metadata/grants/dependency and URL policy | `shared:ToppingRulesTest` |
 | iOS compiler and WebKit contract | `swiftc -typecheck` over `iosApp/CandyIos/*.swift`; `CandyIos` simulator build/smoke |

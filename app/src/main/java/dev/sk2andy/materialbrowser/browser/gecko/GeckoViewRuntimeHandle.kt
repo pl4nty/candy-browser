@@ -920,6 +920,20 @@ private class GeckoViewBrowserSession(
     private val storageController = runtime.storageController
     private val mainHandler = Handler(Looper.getMainLooper())
 
+    private var mozillaAccountWebChannel: GeckoMozillaAccountWebChannel? = null
+
+    override fun bindMozillaAccountWebChannel(
+        handler: (String) -> String?,
+        onReady: (Boolean) -> Unit,
+    ): AutoCloseable? {
+        if (closed || isPrivate) return null
+        mozillaAccountWebChannel?.close()
+        return GeckoMozillaAccountWebChannel(session, handler).also {
+            mozillaAccountWebChannel = it
+            it.install(extensionController, onReady)
+        }
+    }
+
     override val supportsSiteDataDeletion: Boolean get() = !closed
 
     override fun clearSiteData(url: String, onComplete: (Boolean) -> Unit) {
@@ -1178,8 +1192,10 @@ private class GeckoViewBrowserSession(
                             mimeType = contentType,
                         ),
                         startTransfer = { transferListener ->
+                            // Preview closes on start; its accepted transfer must outlive that session.
+                            val ownerKey = if (contentKind == BrowserEngineContentKind.ExternalPreview) Any() else session
                             downloadTransfers.startResponse(
-                                owner = GeckoDownloadOwner(profileId, isPrivate, session),
+                                owner = GeckoDownloadOwner(profileId, isPrivate, ownerKey),
                                 response = response,
                                 referrer = currentPageUrl,
                                 listener = transferListener,
@@ -2202,6 +2218,8 @@ private class GeckoViewBrowserSession(
     override fun setDownloadResponseListener(listener: GeckoDownloadResponseListener?) {
         downloadResponseListener = listener
     }
+
+    override fun hasActiveDownload(): Boolean = downloadTransfers.hasActiveForOwner(session)
 
     override fun startContextDownload(
         request: GeckoContextDownloadRequest,
@@ -3546,6 +3564,8 @@ private class GeckoViewBrowserSession(
         trackingPermissions.remove(trackingPermissionOwner)
         toppingBinding.close()
         toppingBinding = GeckoToppingSessionBinding.None
+        mozillaAccountWebChannel?.close()
+        mozillaAccountWebChannel = null
         privacyBinding.close()
         // Native Gecko objects can outlive close; release their Candy ownership here.
         // ContentDelegate also clears Gecko's process-hang handler through the public API.
@@ -3861,7 +3881,6 @@ private class GeckoViewBrowserSession(
         startedNavigationAttempts.clear()
         cookieBehavior.remove(cookieBehaviorOwner)
         session.stop()
-        updateState { current -> current.copy(isLoading = true, lastNavigationSucceeded = null) }
         updateState { current ->
             current.copy(
                 isLoading = false,

@@ -23,7 +23,6 @@ import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.HorizontalDivider
-import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.KeyboardOptions
@@ -51,6 +50,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
@@ -64,6 +64,8 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardCapitalization
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -86,6 +88,7 @@ internal object FirefoxExtensionManagerTestTags {
     const val InstallUrl = "gecko_extension_install_url"
     const val PermissionPrompt = "gecko_extension_permission_prompt"
 
+    fun extension(extensionId: String): String = "gecko_extension:$extensionId"
     fun optionsPage(extensionId: String): String = "gecko_extension_options:$extensionId"
 }
 
@@ -442,6 +445,7 @@ private fun GeckoExtensionRow(
     Column(
         modifier = Modifier
             .fillMaxWidth()
+            .testTag(FirefoxExtensionManagerTestTags.extension(extension.id))
             .padding(horizontal = 16.dp, vertical = 10.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
@@ -511,10 +515,12 @@ private fun GeckoExtensionRow(
 
 @Composable
 private fun ExtensionIcon(icon: android.graphics.Bitmap?, iconUrl: String?) {
-    val loadedIcon by produceState(initialValue = icon, icon, iconUrl) {
-        if (icon == null && iconUrl != null) {
-            value = withContext(Dispatchers.IO) {
-                FaviconClient().fetchMozillaAddonImage(iconUrl)
+    val loadedIcon by key(icon, iconUrl) {
+        produceState(initialValue = icon) {
+            if (icon == null && iconUrl != null) {
+                value = withContext(Dispatchers.IO) {
+                    FaviconClient().fetchMozillaAddonImage(iconUrl)
+                }
             }
         }
     }
@@ -561,7 +567,12 @@ private fun GeckoExtensionInstallDialog(
                         .fillMaxWidth()
                         .testTag(FirefoxExtensionManagerTestTags.InstallUrl),
                     singleLine = true,
-                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Go),
+                    keyboardOptions = KeyboardOptions(
+                        capitalization = KeyboardCapitalization.None,
+                        autoCorrectEnabled = false,
+                        keyboardType = KeyboardType.Uri,
+                        imeAction = ImeAction.Go,
+                    ),
                     placeholder = { Text("https://…/addon.xpi") },
                 )
             }

@@ -214,7 +214,19 @@ class SystemWebViewBrowserEngineInstrumentedTest {
             val (browserController, createdWebView) = createControllerWithView()
             controller = browserController
             webView = createdWebView
-            browserController.onWindowInsetsChanged(
+            webView.loadDataWithBaseURL(
+                "https://safe-area.test/",
+                "<html><head><title>Safe area ready</title></head><body>safe area</body></html>",
+                "text/html",
+                "utf-8",
+                null,
+            )
+        }
+        composeRule.waitUntil(timeoutMillis = 10_000L) {
+            controller?.selectedTab?.title == "Safe area ready"
+        }
+        composeRule.runOnIdle {
+            requireNotNull(controller).onWindowInsetsChanged(
                 WindowInsetsCompat.Builder()
                     .setInsets(
                         WindowInsetsCompat.Type.systemBars() or
@@ -223,28 +235,31 @@ class SystemWebViewBrowserEngineInstrumentedTest {
                     )
                     .build(),
             )
-            webView.loadDataWithBaseURL(
-                "https://safe-area.test/",
-                "<html><body>safe area</body></html>",
-                "text/html",
-                "utf-8",
-                null,
-            )
         }
-        val result = AtomicReference<String>()
-        val completed = CountDownLatch(1)
-        composeRule.runOnIdle {
-            assertEquals(0, (webView.layoutParams as ViewGroup.MarginLayoutParams).topMargin)
-            webView.evaluateJavascript(
-                "JSON.parse(${SystemWebViewSafeAreaScript.BRIDGE_NAME}.configuration()).cssSafeAreaTopInsetPx",
-            ) { value ->
-                result.set(value)
-                completed.countDown()
+        for (immersive in listOf(false, true, false)) {
+            val result = AtomicReference<String>()
+            val completed = CountDownLatch(1)
+            composeRule.runOnIdle {
+                requireNotNull(controller).updateFullImmersiveModeEnabled(immersive)
+                assertEquals(0, (webView.layoutParams as ViewGroup.MarginLayoutParams).topMargin)
+                webView.evaluateJavascript(
+                    "JSON.parse(${SystemWebViewSafeAreaScript.BRIDGE_NAME}.configuration()).cssSafeAreaTopInsetPx",
+                ) { value ->
+                    result.set(value)
+                    completed.countDown()
+                }
+            }
+
+            assertTrue(completed.await(5, TimeUnit.SECONDS))
+            if (immersive) {
+                assertEquals(0, result.get().toInt())
+            } else {
+                assertTrue(
+                    "immersive=$immersive, inset=${result.get()}",
+                    result.get().toInt() >= EXPECTED_TOP_INSET,
+                )
             }
         }
-
-        assertTrue(completed.await(5, TimeUnit.SECONDS))
-        assertTrue(result.get().toInt() >= EXPECTED_TOP_INSET)
     }
 
     @Test
@@ -366,6 +381,39 @@ class SystemWebViewBrowserEngineInstrumentedTest {
                 assertEquals(null, browserController.selectedTab.error)
                 assertFalse(browserController.selectedTab.isLoading)
             }
+        }
+    }
+
+    @Test
+    fun bareFilterRunsInSystemWebView() {
+        lateinit var browserController: BrowserController
+        lateinit var webView: WebView
+        composeRule.runOnIdle {
+            val created = createControllerWithView()
+            browserController = created.first
+            webView = created.second
+            controller = browserController
+            webView.loadDataWithBaseURL(
+                "https://m.youtube.com/",
+                """<html><head><title>BareFilter probe</title></head><body>
+                    <div class="mobile-topbar-header-sign-in-button" id="app"><a aria-label="Open App"></a></div>
+                    </body></html>""",
+                "text/html",
+                "utf-8",
+                null,
+            )
+        }
+        composeRule.waitUntil(timeoutMillis = 10_000L) {
+            browserController.selectedTab.title == "BareFilter probe"
+        }
+        val result = AtomicReference<String>()
+        composeRule.waitUntil(timeoutMillis = 10_000L) {
+            composeRule.runOnIdle {
+                webView.evaluateJavascript("getComputedStyle(document.getElementById('app')).display") {
+                    result.set(it)
+                }
+            }
+            result.get() == "\"none\""
         }
     }
 

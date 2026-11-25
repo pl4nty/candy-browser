@@ -661,7 +661,7 @@ open class MainActivity : AppCompatActivity() {
                 val visibleProfileProtected = browserController.localBrowserProfiles
                     .firstOrNull { profile -> profile.id == visibleProfileId }
                     ?.protection != null
-                setRecentsScreenshotEnabled(
+                setCandyRecentsScreenshotEnabled(
                     !visibleProfileProtected && !GuestBubbleSessionStore(this).isLocked(),
                 )
             }
@@ -1835,7 +1835,6 @@ open class MainActivity : AppCompatActivity() {
             StartupPresentationRules.shouldOpenHomePage(
                 isLauncherLaunch = intent.action == Intent.ACTION_MAIN,
                 isOpenHomeOnStartupEnabled = browserController.isOpenHomeOnStartupEnabled,
-                startupAddressFocusMode = browserController.startupAddressFocusMode,
             )
         ) {
             browserController.openNormalHome()
@@ -1854,9 +1853,13 @@ open class MainActivity : AppCompatActivity() {
             BrowserHardwareInputAction.NewTab -> {
                 if (externalPreview != null) browserController.dismissExternalLinkPreview()
                 val previousTabId = browserController.selectedTabId
-                browserController.createTab()
+                browserController.createUserTab()
                 if (browserController.selectedTabId != previousTabId) {
-                    launcherAddressEditorRequestId++
+                    if (browserController.selectedTab.url == BLANK_URL) {
+                        launcherAddressEditorRequestId++
+                    } else {
+                        hardwareTabChangeRequestId++
+                    }
                 }
                 true
             }

@@ -236,6 +236,11 @@ internal enum class GeckoMediaCommand {
  * for Compose hosting, so callers cannot reach or replace the process GeckoRuntime.
  */
 internal interface GeckoBrowserSession {
+    fun bindMozillaAccountWebChannel(
+        handler: (String) -> String?,
+        onReady: (Boolean) -> Unit,
+    ): AutoCloseable? = null
+
     val supportsSiteDataDeletion: Boolean get() = false
 
     fun clearSiteData(url: String, onComplete: (Boolean) -> Unit) = onComplete(false)
@@ -256,6 +261,8 @@ internal interface GeckoBrowserSession {
     fun setCloseRequestListener(listener: GeckoCloseRequestListener?) = Unit
 
     fun setDownloadResponseListener(listener: GeckoDownloadResponseListener?) = Unit
+
+    fun hasActiveDownload(): Boolean = false
 
     /** Fetches through Gecko so authenticated/profile/private request state stays engine-owned. */
     fun startContextDownload(

@@ -219,6 +219,9 @@ import dev.sk2andy.materialbrowser.browser.permissions.runtimePermissions
 import dev.sk2andy.materialbrowser.browser.suggestions.SearchSuggestionProvider
 import dev.sk2andy.materialbrowser.browser.userscript.ToppingCatalogEntry
 import dev.sk2andy.materialbrowser.browser.userscript.ToppingCatalogRules
+import dev.sk2andy.materialbrowser.browser.userscript.GreasyForkInstallError
+import dev.sk2andy.materialbrowser.browser.userscript.GreasyForkInstallPrompt
+import dev.sk2andy.materialbrowser.browser.userscript.GreasyForkInstallStage
 import dev.sk2andy.materialbrowser.browser.userscript.UserScript
 import dev.sk2andy.materialbrowser.browser.userscript.UserScriptDependencyFailureReason
 import dev.sk2andy.materialbrowser.browser.userscript.UserScriptDependencyResolution
@@ -269,6 +272,8 @@ import dev.sk2andy.materialbrowser.data.InactiveTabLifetime
 import dev.sk2andy.materialbrowser.data.DownloadManagerMode
 import dev.sk2andy.materialbrowser.data.DownloadRepository
 import dev.sk2andy.materialbrowser.data.ExistingDownload
+import dev.sk2andy.materialbrowser.data.GreasyForkDownloadResult
+import dev.sk2andy.materialbrowser.data.GreasyForkInstall
 import dev.sk2andy.materialbrowser.data.SafeDownloadValues
 import dev.sk2andy.materialbrowser.data.PermissionRadarStore
 import dev.sk2andy.materialbrowser.data.PendingCandyTrailRedaction
@@ -312,6 +317,7 @@ import dev.sk2andy.materialbrowser.data.sync.AndroidSyncCacheStore
 import dev.sk2andy.materialbrowser.data.sync.AndroidSyncSettingsStore
 import dev.sk2andy.materialbrowser.data.sync.AndroidSyncVaultStore
 import dev.sk2andy.materialbrowser.data.sync.CandySyncRepository
+import dev.sk2andy.materialbrowser.data.sync.MozillaSyncRepository
 import dev.sk2andy.materialbrowser.reader.ReaderExtractionFailure
 import dev.sk2andy.materialbrowser.reader.ReaderExtractionParser
 import dev.sk2andy.materialbrowser.reader.ReaderExtractionResult
@@ -339,6 +345,10 @@ import dev.sk2andy.materialbrowser.sync.SyncPendingMutation
 import dev.sk2andy.materialbrowser.sync.SyncProfile
 import dev.sk2andy.materialbrowser.sync.SyncRepositoryState
 import dev.sk2andy.materialbrowser.sync.SyncTab
+import dev.sk2andy.materialbrowser.sync.MozillaSyncRules
+import dev.sk2andy.materialbrowser.sync.MozillaSyncState
+import dev.sk2andy.materialbrowser.sync.MozillaSyncStatus
+import dev.sk2andy.materialbrowser.sync.MozillaSyncTab
 import java.util.ArrayDeque
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
@@ -348,6 +358,11 @@ import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicLong
 import java.util.concurrent.atomic.AtomicReference
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.launch
 
 private class PendingGeckoPreviewCapture(
     val tabId: String,
@@ -902,6 +917,9 @@ class BrowserController(
         private set
     internal var favoriteAnimationSpeed by mutableStateOf(FavoriteAnimationSpeed.Default)
         private set
+    var homePageSettings by mutableStateOf(HomePageSettings())
+        private set
+
     var isOpenHomeOnStartupEnabled by mutableStateOf(false)
         private set
     var isScrollBarEnabled by mutableStateOf(false)
@@ -950,6 +968,8 @@ class BrowserController(
         private set
     var pendingDownloadChoice by mutableStateOf<PendingDownloadChoice?>(null)
         private set
+    internal var greasyForkInstallPrompt by mutableStateOf<GreasyForkInstallPrompt?>(null)
+        private set
     var isDefaultBrowser by mutableStateOf(false)
         private set
     var isOnline by mutableStateOf(true)
@@ -986,7 +1006,8 @@ class BrowserController(
         get() = usesGeckoEngine
 
     val isHttpPasswordAutofillSupported: Boolean
-        get() = browserEngineCapabilities.insecureHttpPasswordManagerSelection
+        get() = Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE &&
+            browserEngineCapabilities.insecureHttpPasswordManagerSelection
 
     val isUserScriptSupported: Boolean
         get() = isUserScriptSupportedState
@@ -1390,6 +1411,14 @@ class BrowserController(
     }
 
     @VisibleForTesting
+    internal fun applyMozillaSyncStateForTesting(state: MozillaSyncState) {
+        applyMozillaSyncState(state)
+    }
+
+    @VisibleForTesting
+    internal fun openMozillaAuthTabForTesting(url: String) = openMozillaAuthTab(url)
+
+    @VisibleForTesting
     internal fun dispatchGeckoEngineEventForTesting(event: BrowserEngineEvent) {
         onGeckoEngineEvent(event)
     }
@@ -1431,6 +1460,13 @@ class BrowserController(
             session = browserEngineSessionFor(tabId),
             request = request,
         )
+    }
+
+    @VisibleForTesting
+    internal fun dispatchSelectedGeckoNewSessionForTesting(request: GeckoNewSessionRequest): Boolean {
+        check(usesGeckoEngine)
+        val tabId = selectedTabId
+        return onGeckoNewSession(tabId, browserEngineSessionFor(tabId), request)
     }
 
     @VisibleForTesting
@@ -1604,6 +1640,17 @@ class BrowserController(
     var syncState by mutableStateOf(syncRepository.currentState())
         private set
     private var syncObservation: AutoCloseable? = null
+    private val mozillaSyncRepository = MozillaSyncRepository.getInstance(activity.applicationContext)
+    private val mozillaSyncScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
+    var mozillaSyncState by mutableStateOf(mozillaSyncRepository.currentState())
+        private set
+    var viewedMozillaDeviceId by mutableStateOf<String?>(null)
+        private set
+    private var mozillaAuthTabId: String? = null
+    private var mozillaAuthWebChannel: AutoCloseable? = null
+    private var mozillaSyncObservation: AutoCloseable? = null
+    private var lastPublishedMozillaTabs: List<MozillaSyncTab>? = null
+    private val publishMozillaTabsRunnable = Runnable { publishMozillaTabs() }
     private val locallyPendingSyncCandyIds = mutableSetOf<String>()
     private val pendingSyncReopenMutationIds = mutableMapOf<String, String>()
     private val pendingSyncNavigationRunnables = mutableMapOf<String, Runnable>()
@@ -1669,6 +1716,14 @@ class BrowserController(
     private var destroyed = false
     private var previewContentBottomInWindowPx: Int? = null
     private var addressBarViewportRect: BrowserViewportRect? = null
+    private var autoParkedAddressBar: Pair<String, BrowserViewportRect>? by mutableStateOf(null)
+    val isAddressBarAutomaticallyParked: Boolean
+        get() = autoParkedAddressBar?.first == selectedTabId
+    var autoParkedAddressBarOffsetFraction by mutableStateOf(0f)
+        private set
+    private var autoParkedAddressBarRect: BrowserViewportRect? = null
+    private var pendingAutoParkedAddressBarProbe: Runnable? = null
+    private var autoParkRestoreProbePending = false
     private var selectedBrowserBackdropBlurRegion: BrowserBackdropBlurRegion? = null
     private var pendingAddressBarAutoDockProbe: Runnable? = null
     private var pendingAddressBarAutoDockTabId: String? = null
@@ -1772,6 +1827,10 @@ class BrowserController(
     private val externalDownloadManager = ExternalDownloadManager(activity)
 
     @VisibleForTesting
+    internal var greasyForkDownloadForTesting:
+        ((String, (GreasyForkDownloadResult) -> Unit) -> Unit)? = null
+
+    @VisibleForTesting
     internal var externalDownloadDiscoveryForTesting: ((BrowserDownloadRequest?) -> List<ExternalDownloadManagerApp>)? = null
 
     @VisibleForTesting
@@ -1790,6 +1849,11 @@ class BrowserController(
             BrowserEngineDownloadRules.request(response.metadata, externalLinkPreviewState?.currentUrl),
         )
         routeExternalPreviewDownload(runtime, response, request)
+    }
+
+    @VisibleForTesting
+    internal fun dispatchExternalPreviewDownloadResponseForTesting(response: GeckoExternalDownloadResponse) {
+        onExternalPreviewDownloadResponse(requireNotNull(externalLinkPreviewRuntime), response)
     }
 
     @VisibleForTesting
@@ -1913,7 +1977,9 @@ class BrowserController(
         profiles.any { it.id == profileId && it.isSynced }
 
     private fun syncTargetDeviceId(profileId: String): String? {
-        profiles.firstOrNull { it.id == profileId }?.syncedDeviceId?.let { return it }
+        profiles.firstOrNull { it.id == profileId && it.syncProvider == SyncProvider.Candy }
+            ?.syncedDeviceId?.let { return it }
+        if (isSyncedProfile(profileId)) return null
         val state = syncState
         val currentDeviceId = state.currentDeviceId ?: return null
         val configuredProfileId = state.settings?.localProfileId
@@ -1928,6 +1994,9 @@ class BrowserController(
 
     private fun isBoundSyncProfile(profileId: String): Boolean =
         !isSyncedProfile(profileId) && syncTargetDeviceId(profileId) != null
+
+    private fun isBoundMozillaProfile(profileId: String): Boolean =
+        mozillaSyncState.localProfileId == profileId
 
     val activeTabStacks: List<TabStack>
         get() = TabStackRules.sanitized(tabStacks, activeTabs)
@@ -2856,6 +2925,7 @@ class BrowserController(
         isHttpPasswordAutofillEnabled = store.loadHttpPasswordAutofillEnabled()
         isFavoriteLaunchAnimationEnabled = store.loadFavoriteLaunchAnimationEnabled()
         favoriteAnimationSpeed = store.loadFavoriteAnimationSpeed()
+        homePageSettings = store.loadHomePageSettings()
         isOpenHomeOnStartupEnabled = store.loadOpenHomeOnStartupEnabled()
         isScrollBarEnabled = store.loadScrollBarEnabled()
         inlineMediaPlayerMode = store.loadInlineMediaPlayerMode()
@@ -3049,6 +3119,12 @@ class BrowserController(
                     if (!destroyed) applySyncRepositoryState(state)
                 }
             }
+            mozillaSyncObservation = mozillaSyncRepository.observe { state ->
+                mainHandler.post {
+                    if (!destroyed) applyMozillaSyncState(state)
+                }
+            }
+            mozillaSyncScope.launch { mozillaSyncRepository.start() }
         }
     }
 
@@ -4927,24 +5003,7 @@ class BrowserController(
                 generation = state.generation,
                 session = session,
             ) ?: return@setDownloadResponseListener response.close()
-            val metadata = response.metadata
-            val nowElapsedRealtime = SystemClock.elapsedRealtime()
-            if (!ExternalPreviewDownloadGrantRules.canConsume(
-                    grant = runtime.downloadGrant,
-                    url = metadata.url,
-                    nowElapsedRealtime = nowElapsedRealtime,
-                )
-            ) return@setDownloadResponseListener response.close()
-            val request = BrowserEngineDownloadRules.request(
-                response = metadata,
-                referrer = externalLinkPreviewState?.currentUrl,
-            ) ?: return@setDownloadResponseListener response.close()
-            if (!BrowserDownloadRequestFactory.isAndroidPackage(request)) {
-                return@setDownloadResponseListener response.close()
-            }
-            runtime.downloadGrant = null
-            externalNavigationGrants.remove(runtime.policyTab.id)
-            routeExternalPreviewDownload(runtime, response, request)
+            onExternalPreviewDownloadResponse(runtime, response)
         }
         session.setVideoAutoplayBlocked(isVideoAutoplayBlocked)
         session.setHttpPasswordManagerSelectionEnabled(isHttpPasswordAutofillEnabled)
@@ -4964,6 +5023,26 @@ class BrowserController(
         externalLinkPreviewRuntime = runtime
         externalLinkPreviewState = state.copy(isContentReady = true)
         view.doOnAttach { startExternalLinkPreviewIfReady(runtime) }
+    }
+
+    private fun onExternalPreviewDownloadResponse(
+        runtime: ExternalLinkPreviewRuntime,
+        response: GeckoExternalDownloadResponse,
+    ) {
+        val metadata = response.metadata
+        if (!ExternalPreviewDownloadGrantRules.canConsume(
+                grant = runtime.downloadGrant,
+                url = metadata.url,
+                nowElapsedRealtime = SystemClock.elapsedRealtime(),
+            )
+        ) return response.close()
+        val request = BrowserEngineDownloadRules.request(
+            response = metadata,
+            referrer = externalLinkPreviewState?.currentUrl,
+        ) ?: return response.close()
+        runtime.downloadGrant = null
+        externalNavigationGrants.remove(runtime.policyTab.id)
+        routeExternalPreviewDownload(runtime, response, request)
     }
 
     private fun routeExternalPreviewDownload(
@@ -5445,7 +5524,9 @@ class BrowserController(
             insets
         }
         val safeArea = effectiveInsets.getInsets(SAFE_AREA_INSET_TYPES).toGeckoViewInsets().let {
-            if (tabId != null && isActiveFirefoxExtensionOptionsPage(tabId)) {
+            if (isFullImmersiveModeEnabled) {
+                GeckoViewInsets.Zero
+            } else if (tabId != null && isActiveFirefoxExtensionOptionsPage(tabId)) {
                 it.copy(top = 0)
             } else {
                 it
@@ -5665,6 +5746,7 @@ class BrowserController(
                         source = source,
                         grant = grant,
                         isRedirect = false,
+                        allowStoppedSourceNavigation = true,
                     )
                     return
                 }
@@ -5998,6 +6080,26 @@ class BrowserController(
         }
     }
 
+    fun updateHomePageSettings(settings: HomePageSettings) {
+        homePageSettings = HomePageRules.sanitize(settings)
+        store.saveHomePageSettings(homePageSettings)
+    }
+
+    /** Explicit Home action only; startup and recovery keep their internal-page behavior. */
+    fun openHomePage(): Boolean {
+        val url = homePageSettings.homeUrl.takeIf(String::isNotEmpty)
+            ?: return openNormalHome()
+        leaveSiteCapsule()
+        submitAddress(url)
+        return true
+    }
+
+    /** User-requested empty tabs only; links, popups and engine bootstrap keep createTab. */
+    fun createUserTab(isIncognito: Boolean = selectedTab.isIncognito): String = createTab(
+        initialUrl = HomePageRules.newTabUrl(homePageSettings, isIncognito),
+        isIncognito = isIncognito,
+    )
+
     fun openNormalHome(): Boolean {
         leaveSiteCapsule()
         StartupHomeRules.reusableBlankTabId(activeTabs)?.let { tabId ->
@@ -6308,6 +6410,86 @@ class BrowserController(
                     }
                 }
             }
+        }
+    }
+
+    private fun beginGreasyForkInstall(tabId: String, url: String) {
+        val tab = tabs.firstOrNull { it.id == tabId } ?: return
+        val prompt = GreasyForkInstallPrompt(
+            tabId = tabId,
+            stage = if (tab.isIncognito) {
+                GreasyForkInstallStage.PrivateBlocked
+            } else {
+                GreasyForkInstallStage.Loading
+            },
+        )
+        greasyForkInstallPrompt = prompt
+        if (tab.isIncognito) return
+        val onDownloaded: (GreasyForkDownloadResult) -> Unit = { result ->
+            mainHandler.post {
+                if (destroyed || greasyForkInstallPrompt !== prompt) return@post
+                if (tabs.none { it.id == tabId }) {
+                    greasyForkInstallPrompt = null
+                    return@post
+                }
+                val stage = when (result) {
+                    is GreasyForkDownloadResult.Success -> GreasyForkInstallStage.Review(result.script)
+                    GreasyForkDownloadResult.InvalidUrl,
+                    GreasyForkDownloadResult.Network,
+                    -> GreasyForkInstallStage.Failed(GreasyForkInstallError.Network)
+                    GreasyForkDownloadResult.TooLarge ->
+                        GreasyForkInstallStage.Failed(GreasyForkInstallError.TooLarge)
+                    GreasyForkDownloadResult.InvalidUtf8 ->
+                        GreasyForkInstallStage.Failed(GreasyForkInstallError.InvalidUtf8)
+                    is GreasyForkDownloadResult.InvalidScript -> GreasyForkInstallStage.Failed(
+                        if (result.reason == UserScriptRejectionReason.PrivilegedGrant) {
+                            GreasyForkInstallError.UnsupportedGrant
+                        } else {
+                            GreasyForkInstallError.InvalidScript
+                        },
+                    )
+                }
+                greasyForkInstallPrompt = prompt.copy(stage = stage)
+            }
+        }
+        val testDownload = greasyForkDownloadForTesting
+        if (testDownload != null) testDownload(url, onDownloaded)
+        else userScriptRepository.downloadGreasyForkScript(url, onDownloaded)
+    }
+
+    internal fun dismissGreasyForkInstall() {
+        greasyForkInstallPrompt = null
+    }
+
+    internal fun confirmGreasyForkInstall() {
+        val prompt = greasyForkInstallPrompt ?: return
+        val review = prompt.stage as? GreasyForkInstallStage.Review ?: return
+        if (review.isSaving || selectedTabId != prompt.tabId ||
+            tabs.none { it.id == prompt.tabId && !it.isIncognito }
+        ) return
+        val saving = prompt.copy(stage = review.copy(isSaving = true))
+        greasyForkInstallPrompt = saving
+        val installed = userScripts.firstOrNull { it.source == review.script.source }
+        if (installed != null) {
+            setUserScriptEnabled(installed.id, true) { enabled ->
+                if (greasyForkInstallPrompt !== saving) return@setUserScriptEnabled
+                greasyForkInstallPrompt = saving.copy(
+                    stage = if (enabled) GreasyForkInstallStage.Installed
+                    else GreasyForkInstallStage.Failed(GreasyForkInstallError.SaveFailed),
+                )
+            }
+            return
+        }
+        saveUserScript(id = null, source = review.script.source) { outcome ->
+            if (greasyForkInstallPrompt !== saving) return@saveUserScript
+            greasyForkInstallPrompt = saving.copy(
+                stage = when (outcome) {
+                    UserScriptSaveOutcome.Saved -> GreasyForkInstallStage.Installed
+                    is UserScriptSaveOutcome.DependencyFailed ->
+                        GreasyForkInstallStage.Failed(GreasyForkInstallError.DependencyFailed)
+                    else -> GreasyForkInstallStage.Failed(GreasyForkInstallError.SaveFailed)
+                },
+            )
         }
     }
 
@@ -6800,6 +6982,8 @@ class BrowserController(
     fun selectProfile(profileId: String): Boolean {
         if (!profilesEnabled) return false
         if (profileId == activeProfileId || profiles.none { it.id == profileId }) return false
+        profiles.firstOrNull { it.id == profileId && it.syncProvider == SyncProvider.Mozilla }
+            ?.syncedDeviceId?.let { viewedMozillaDeviceId = it; return true }
         if (profileId in lockedProfileIds) return false
         return selectProfileNow(profileId)
     }
@@ -6829,6 +7013,12 @@ class BrowserController(
             mainHandler.post { if (!destroyed) onComplete(false) }
             return true
         }
+        profiles.firstOrNull { it.id == profileId && it.syncProvider == SyncProvider.Mozilla }
+            ?.syncedDeviceId?.let { deviceId ->
+                viewedMozillaDeviceId = deviceId
+                mainHandler.post { if (!destroyed) onComplete(true) }
+                return true
+            }
         if (profileId !in lockedProfileIds) {
             val selected = selectProfileNow(profileId)
             mainHandler.post { if (!destroyed) onComplete(selected) }
@@ -6879,6 +7069,7 @@ class BrowserController(
     private fun selectProfileNow(profileId: String): Boolean {
         if (!profilesEnabled) return false
         if (profileId == activeProfileId || profiles.none { it.id == profileId }) return false
+        if (profiles.any { it.id == profileId && it.syncProvider == SyncProvider.Mozilla }) return false
         dismissClosedTabUndo()
         val previousTabId = selectedTabId
         clearPermissionActivity(previousTabId)
@@ -6909,7 +7100,8 @@ class BrowserController(
     fun leaveLockedProfile(): Boolean {
         if (!isActiveProfileLocked) return false
         val targetProfileId = profiles.firstOrNull { profile ->
-            profile.id != activeProfileId && profile.id !in lockedProfileIds
+            profile.id != activeProfileId && profile.syncProvider != SyncProvider.Mozilla &&
+                profile.id !in lockedProfileIds
         }?.id ?: return false
         if (!profilesEnabled) {
             profilesEnabled = true
@@ -7222,6 +7414,7 @@ class BrowserController(
             localProfiles.size <= 1 ||
             isSyncedProfile(profileId) ||
             isBoundSyncProfile(profileId) ||
+            isBoundMozillaProfile(profileId) ||
             profileId in lockedProfileIds ||
             profileId in pendingProfileIsolationChanges ||
             profiles.none { it.id == profileId }
@@ -7283,6 +7476,7 @@ class BrowserController(
             localProfiles.size <= 1 ||
             isSyncedProfile(profileId) ||
             isBoundSyncProfile(profileId) ||
+            isBoundMozillaProfile(profileId) ||
             profileId in lockedProfileIds
         ) {
             return false
@@ -7293,11 +7487,8 @@ class BrowserController(
         formDrafts.deleteProfile(profileId)
         if (closedTabUndoOffer?.tab?.profileId == profileId) dismissClosedTabUndo()
         val remainingLocalProfiles = localProfiles.filterNot { it.id == profileId }
-        val fallbackProfile = if (profileId == activeProfileId) {
-            remainingLocalProfiles.first()
-        } else {
-            localProfiles.first { it.id == activeProfileId }
-        }
+        val fallbackProfile = remainingLocalProfiles.firstOrNull { it.id == activeProfileId }
+            ?: remainingLocalProfiles.first()
         val removedProfileTrailTabIds = (
             tabs.asSequence() + snoozedTabs.asSequence().map { snoozed -> snoozed.tab }
         )
@@ -7435,6 +7626,7 @@ class BrowserController(
         if (
             sourceTab.profileId == profileId ||
             profileId in lockedProfileIds ||
+            profiles.any { it.id == profileId && it.syncProvider == SyncProvider.Mozilla } ||
             profiles.none { it.id == profileId }
         ) return false
         val targetIsSynced = isSyncedProfile(profileId)
@@ -7499,6 +7691,7 @@ class BrowserController(
         val sourceTab = tabs.firstOrNull { tab -> tab.id == tabId } ?: return emptyList()
         return profiles.filter { profile ->
             profile.id != sourceTab.profileId &&
+                profile.syncProvider != SyncProvider.Mozilla &&
                 profile.id !in lockedProfileIds &&
                 (!sourceTab.isIncognito || !profile.isSynced)
         }
@@ -8088,6 +8281,7 @@ class BrowserController(
         grant: ExternalNavigationGrant?,
         isRedirect: Boolean,
         nativePopupResponse: BrowserEngineBooleanResponse? = null,
+        allowStoppedSourceNavigation: Boolean = false,
     ) {
         val policyTabId = source.policyTabId()
         cancelPendingAutomaticExternalAppRequest(policyTabId)
@@ -8140,6 +8334,7 @@ class BrowserController(
                     requestGeneration = sourceRequestGeneration,
                     navigationGeneration = sourceNavigationGeneration,
                     pageUrl = sourcePageUrl,
+                    allowStoppedSourceNavigation = allowStoppedSourceNavigation,
                 )
             ) {
                 clearExternalNavigationRollback(source)
@@ -8312,10 +8507,13 @@ class BrowserController(
         requestGeneration: Long,
         navigationGeneration: Int,
         pageUrl: String?,
+        allowStoppedSourceNavigation: Boolean = false,
     ): Boolean = when (source) {
         is ExternalAppHandoffSource.Tab ->
             isExternalAppSourceCurrent(source) &&
-                browserEngineDocumentGenerations.getOrDefault(source.tabId, 0L) == documentGeneration &&
+                (browserEngineDocumentGenerations.getOrDefault(source.tabId, 0L) == documentGeneration ||
+                    (allowStoppedSourceNavigation && pageUrl != null &&
+                        currentExternalAppSourcePageUrl(source) == pageUrl)) &&
                 browserEngineNavigationRequestGenerations.getOrDefault(source.tabId, 0L) == requestGeneration
         is ExternalAppHandoffSource.Preview -> isExternalAppSourceSnapshotCurrent(
             source = source,
@@ -10627,11 +10825,23 @@ class BrowserController(
     }
 
     fun updateAddressBarDockPlacement(placement: AddressBarDockPlacement?) {
+        setAddressBarDockPlacement(placement, manualRestoration = true)
+    }
+
+    private fun setAddressBarDockPlacement(
+        placement: AddressBarDockPlacement?,
+        manualRestoration: Boolean,
+    ) {
         val normalized = placement?.normalized()
         if (normalized != null && !isAddressBarDockingEnabled) return
-        if (addressBarDockPlacement == normalized) return
+        if (addressBarDockPlacement == normalized) {
+            if (manualRestoration && normalized != null) clearAutoParkedAddressBar()
+            return
+        }
+        clearAutoParkedAddressBar()
+        autoParkRestoreProbePending = false
         cancelAddressBarAutoDockProbe()
-        if (normalized == null && isAddressBarDockingEnabled) {
+        if (normalized == null && isAddressBarDockingEnabled && manualRestoration) {
             manuallyUnparkedAddressBarTabIds += selectedTabId
             AppLogging.record(AppLogEvent.AddressBarManuallyUnparked)
         } else if (normalized != null) {
@@ -10744,6 +10954,8 @@ class BrowserController(
         isFullImmersiveModeEnabled = enabled
         store.saveFullImmersiveModeEnabled(enabled)
         onFullImmersiveModeChanged(enabled)
+        refreshGeckoContentTopInsetPolicies()
+        lastWindowInsets?.let(::dispatchWindowInsetsToAttachedEngineViews)
     }
 
     fun updateAddressBarSwipeModeEnabled(enabled: Boolean) {
@@ -11148,6 +11360,106 @@ class BrowserController(
         syncRepository.refresh()
     }
 
+    fun connectMozillaSync(profileId: String, deviceName: String): Boolean {
+        if (!usesGeckoEngine) return false
+        if (localProfiles.none { it.id == profileId }) return false
+        if (!mozillaSyncRepository.configureLocalProfile(profileId, deviceName)) return false
+        mozillaSyncScope.launch {
+            mozillaSyncRepository.start()
+            val url = mozillaSyncRepository.beginAuthentication() ?: return@launch
+            val safeUrl = BrowserUriPolicy.normalizeHttpUrl(url) ?: return@launch
+            requestProfileSelection(profileId) { selected ->
+                if (selected) openMozillaAuthTab(safeUrl)
+                else mozillaSyncRepository.authenticationCancelled()
+            }
+        }
+        return true
+    }
+
+    private fun openMozillaAuthTab(url: String) {
+        if (!usesGeckoEngine) return mozillaSyncRepository.authenticationCancelled()
+        val previousAuthTabId = mozillaAuthTabId
+        mozillaAuthTabId = null
+        mozillaAuthWebChannel?.close()
+        mozillaAuthWebChannel = null
+        previousAuthTabId?.let(::closeTab)
+        val tabId = createBackgroundTab(
+            initialUrl = BLANK_URL,
+            openerTabId = selectedTabId,
+            isIncognito = false,
+            transientPopup = true,
+        ) ?: return mozillaSyncRepository.authenticationCancelled()
+        transientPopupTabIds.remove(tabId)
+        federatedLoginPopupTabIds += tabId
+        mozillaAuthTabId = tabId
+        updateTab(tabId) { it.copy(syncCandyId = null) }
+        selectTab(tabId)
+        val session = browserEngineSessionFor(tabId)
+        mozillaAuthWebChannel = session.bindMozillaAccountWebChannel(
+            handler = mozillaSyncRepository::handleWebChannelMessage,
+            onReady = { ready ->
+                if (!destroyed && mozillaAuthTabId == tabId && browserEngineSessions[tabId] === session) {
+                    if (ready) {
+                        updateTab(tabId) { it.copy(url = url, isLoading = true) }
+                        loadGeckoWithPrivacy(tabId, session, url)
+                    } else {
+                        closeTab(tabId)
+                    }
+                }
+            },
+        )
+        if (mozillaAuthWebChannel == null) {
+            closeTab(tabId)
+            mozillaSyncRepository.authenticationCancelled()
+        }
+    }
+
+    fun refreshMozillaSync() {
+        lastPublishedMozillaTabs = null
+        scheduleMozillaTabsPublish()
+        mozillaSyncScope.launch { mozillaSyncRepository.refresh() }
+    }
+
+    fun disconnectMozillaSync() {
+        mozillaSyncScope.launch { mozillaSyncRepository.logout() }
+    }
+
+    fun dismissMozillaDevice() {
+        viewedMozillaDeviceId = null
+    }
+
+    fun openMozillaTab(tab: MozillaSyncTab): Boolean {
+        val url = BrowserUriPolicy.normalizeHttpUrl(tab.url) ?: return false
+        val profileId = mozillaSyncState.localProfileId ?: return false
+        if (localProfiles.none { it.id == profileId }) return false
+        return requestProfileSelection(profileId) { selected ->
+            if (selected) {
+                dismissMozillaDevice()
+                createTab(initialUrl = url, isIncognito = false)
+            }
+        }
+    }
+
+    val canSendSelectedTabToMozilla: Boolean
+        get() = selectedTab.let { tab ->
+            !tab.isIncognito && !isSessionEphemeralTab(tab.id) &&
+                tab.id !in activeFederatedLoginFlowTabIds() && !isSyncedProfile(tab.profileId) &&
+                tab.profileId !in lockedProfileIds && BrowserUriPolicy.normalizeHttpUrl(tab.url) != null
+        }
+
+    fun sendSelectedTabToMozillaDevice(deviceId: String, onComplete: (Boolean) -> Unit) {
+        val tab = selectedTab
+        val url = BrowserUriPolicy.normalizeHttpUrl(tab.url)
+        val device = mozillaSyncState.devices.firstOrNull { it.id == deviceId && it.canReceiveTabs }
+        if (!canSendSelectedTabToMozilla || url == null || device == null) {
+            onComplete(false)
+            return
+        }
+        mozillaSyncScope.launch {
+            onComplete(mozillaSyncRepository.sendTab(deviceId, tab.title, url))
+        }
+    }
+
     fun onAppearanceConfigurationChanged() {
         val externalPreview = externalLinkPreviewState
         browserEngineSessionFactory.onConfigurationChanged(activity.resources.configuration)
@@ -11274,6 +11586,63 @@ class BrowserController(
         cancelAddressBarAutoDockProbe()
     }
 
+    fun setAutoParkedAddressBarBoundsInViewport(
+        leftPx: Float,
+        topPx: Float,
+        rightPx: Float,
+        bottomPx: Float,
+        viewportWidthPx: Float,
+        viewportHeightPx: Float,
+    ) {
+        val rect = AddressBarAutoDockRules.viewportRect(
+            leftPx, topPx, rightPx, bottomPx, viewportWidthPx, viewportHeightPx,
+        )
+        if (autoParkedAddressBarRect == rect) return
+        autoParkedAddressBarRect = rect
+        scheduleAutoParkedAddressBarProbe(350L)
+    }
+
+    fun clearAutoParkedAddressBarBounds() {
+        autoParkedAddressBarRect = null
+        pendingAutoParkedAddressBarProbe?.let(mainHandler::removeCallbacks)
+        pendingAutoParkedAddressBarProbe = null
+    }
+
+    private fun clearAutoParkedAddressBar() {
+        clearAutoParkedAddressBarBounds()
+        autoParkedAddressBar = null
+        autoParkedAddressBarOffsetFraction = 0f
+    }
+
+    private fun scheduleAutoParkedAddressBarProbe(delayMillis: Long) {
+        pendingAutoParkedAddressBarProbe?.let(mainHandler::removeCallbacks)
+        if (!isAddressBarAutomaticallyParked || autoParkedAddressBarRect == null) return
+        val probe = Runnable {
+            pendingAutoParkedAddressBarProbe = null
+            val parked = autoParkedAddressBar ?: return@Runnable
+            val rect = autoParkedAddressBarRect ?: return@Runnable
+            val session = browserEngineSessions[parked.first] ?: return@Runnable
+            if (!isAddressBarAutomaticallyParked || !isAddressBarAutoDockBrowserVisible()) return@Runnable
+            session.probeTextInputOcclusion(rect, TextInputOcclusionProbeMode.AllEditors) { result ->
+                if (
+                    autoParkedAddressBar !== parked ||
+                    autoParkedAddressBarRect != rect ||
+                    browserEngineSessions[parked.first] !== session ||
+                    !isAddressBarAutomaticallyParked ||
+                    !isAddressBarAutoDockBrowserVisible()
+                ) return@probeTextInputOcclusion
+                if (result == TextInputOcclusionProbeResult.Occluded) {
+                    val available = 1f - (addressBarDockPlacement?.verticalFraction ?: 0f)
+                    autoParkedAddressBarOffsetFraction = (
+                        autoParkedAddressBarOffsetFraction + rect.bottomFraction - rect.topFraction
+                    ).coerceAtMost(available)
+                }
+            }
+        }
+        pendingAutoParkedAddressBarProbe = probe
+        mainHandler.postDelayed(probe, delayMillis)
+    }
+
     fun previewTopInsetPx(tabId: String): Int = if (
         !developerSettings.forceSafeAreaFallback &&
         !isSafeAreaForced(tabId) &&
@@ -11282,7 +11651,7 @@ class BrowserController(
     ) {
         0
     } else {
-        lastWindowInsets?.getInsets(SAFE_AREA_INSET_TYPES)?.top?.coerceAtLeast(0) ?: 0
+        currentSafeAreaTopInsetPx()
     }
 
     fun updateBlockerSettings(settings: BlockerSettings) {
@@ -11953,6 +12322,8 @@ class BrowserController(
         formDrafts.detach()
         stopInlineVideoGestureHaptic()
         cancelAddressBarAutoDockProbe()
+        pendingAutoParkedAddressBarProbe?.let(mainHandler::removeCallbacks)
+        pendingAutoParkedAddressBarProbe = null
         contentActions.dismiss()
         if (externalLinkPreviewState == null) {
             captureVisiblePreview(selectedTabId, acceptAfterDeparture = true)
@@ -12055,6 +12426,7 @@ class BrowserController(
         }
         if (isActiveProfileLocked) retryActiveProfileAuthentication()
         scheduleSelectedAddressBarAutoDockProbe()
+        scheduleAutoParkedAddressBarProbe(350L)
     }
 
     fun onStart() {
@@ -12516,6 +12888,12 @@ class BrowserController(
         syncObservation?.close()
         syncObservation = null
         syncRepository.close()
+        mainHandler.removeCallbacks(publishMozillaTabsRunnable)
+        mozillaSyncObservation?.close()
+        mozillaAuthWebChannel?.close()
+        mozillaAuthWebChannel = null
+        if (mozillaAuthTabId != null) mozillaSyncRepository.authenticationCancelled()
+        mozillaSyncScope.cancel()
         closeFindInPage()
         releaseExternalLinkPreviewRuntime(resumeSelectedTab = false)
         clearGeckoMediaPresentation()
@@ -13040,6 +13418,15 @@ class BrowserController(
         if (handlePendingPopunderOpenerNavigation(tabId, session, request.url)) {
             return GeckoNavigationRequestDecision.Deny
         }
+        if (GreasyForkInstall.isInstallUrl(request.url) && GreasyForkInstall.shouldOffer(
+                request.url,
+                BrowserUriPolicy.normalizeHttpUrl(session.historyUrlAtOffset(0)) ?: currentUrl,
+                request.hasUserGesture,
+            )
+        ) {
+            beginGreasyForkInstall(tabId, request.url)
+            return GeckoNavigationRequestDecision.Deny
+        }
         val publisherUrl = if (
             isAutoDeAmpEnabled && request.target == BrowserEngineNavigationTarget.Current
         ) {
@@ -13216,6 +13603,16 @@ class BrowserController(
         if (destroyed || browserEngineSessions[openerTabId] !== openerSession) return false
         val extensionChrome = firefoxExtensionOptionsTabs[openerTabId]
         val opener = tabs.firstOrNull { tab -> tab.id == openerTabId } ?: return false
+        if (GreasyForkInstall.isInstallUrl(request.url) && GreasyForkInstall.shouldOffer(
+                request.url,
+                BrowserUriPolicy.normalizeHttpUrl(openerSession.historyUrlAtOffset(0))
+                    ?: pageUrls[openerTabId] ?: opener.url,
+                hasUserGesture = false,
+            )
+        ) {
+            beginGreasyForkInstall(openerTabId, request.url)
+            return false
+        }
         val extensionUrl = GeckoExtensionChromeRules.normalizeOptionsPageUrl(
             extensionChrome?.initialUrl ?: pageUrls[openerTabId] ?: opener.url,
             request.url,
@@ -14144,7 +14541,7 @@ class BrowserController(
         session: AndroidBrowserEngineSessionPort,
         url: String,
     ) {
-        stoppedBrowserEngineNavigations.remove(tabId)
+        val stopped = stoppedBrowserEngineNavigations.remove(tabId)
         val targetUrl = autoDeAmpPublisherUrl(tabId, url) ?: url
         resetWebContentSafeAreaForDomainNavigation(tabId, targetUrl)
         pageUrls[tabId] = targetUrl
@@ -14152,7 +14549,9 @@ class BrowserController(
         val policy = geckoPrivacyPolicyFor(tabId) ?: return
         val pending = pendingInitialBrowserEngineNavigations[tabId]
             ?.takeIf { candidate -> candidate.session === session }
-        val waitingForPolicy = pending?.let {
+        val waitingForPolicy = if (
+            pending != null || stopped?.let { it.session === session && it.waitsForViewport } == true
+        ) {
             PendingInitialBrowserEngineNavigation(
                 session = session,
                 command = null,
@@ -14160,7 +14559,7 @@ class BrowserController(
             ).also { waiting ->
                 setPendingInitialBrowserEngineNavigation(tabId, waiting)
             }
-        }
+        } else null
         val requestId = ++nextBrowserEngineLoadRequestId
         pendingBrowserEngineLoadRequests[tabId] = requestId
         if (!usesGeckoEngine) session.execute(BrowserEngineCommands.stop())
@@ -14315,11 +14714,11 @@ class BrowserController(
             currentSafeAreaTopInsetPx()
         }
 
-    private fun currentSafeAreaTopInsetPx(): Int = lastWindowInsets
-        ?.getInsets(SAFE_AREA_INSET_TYPES)
-        ?.top
-        ?.coerceAtLeast(0)
-        ?: 0
+    private fun currentSafeAreaTopInsetPx(): Int = if (isFullImmersiveModeEnabled) {
+        0
+    } else {
+        lastWindowInsets?.getInsets(SAFE_AREA_INSET_TYPES)?.top?.coerceAtLeast(0) ?: 0
+    }
 
     private fun usesNativeSafeArea(tabId: String): Boolean =
         isSafeAreaForced(tabId) || isActiveFirefoxExtensionOptionsPage(tabId)
@@ -14594,6 +14993,10 @@ class BrowserController(
         ) return
         when (event.type) {
             BrowserEngineEventType.NavigationStarted -> {
+                if (autoParkedAddressBar?.first == event.tabId) {
+                    clearAutoParkedAddressBar()
+                    autoParkRestoreProbePending = false
+                }
                 stoppedBrowserEngineNavigations.remove(event.tabId)
                 recordSessionDiagnostic(BrowserSessionDiagnostics.Event.NavigationStarted, event.tabId)
                 cancelPendingMemorySessionCheck(event.tabId)
@@ -15040,6 +15443,7 @@ class BrowserController(
                 }
                 if (result == TextInputOcclusionProbeResult.Occluded) {
                     updateAddressBarDocked(true)
+                    autoParkedAddressBar = tabId to requireNotNull(viewportRect)
                     AppLogging.record(
                         if (mode == TextInputOcclusionProbeMode.FocusedTextInput) {
                             AppLogEvent.AddressBarAutoParkedForFocusedInput
@@ -15381,7 +15785,6 @@ class BrowserController(
         rendererIsCurrent: Boolean,
         event: BrowserEngineScrollEvent,
     ) {
-        if (isAddressBarSwipeModeEnabled) return
         if (
             !BrowserChromeScrollRules.accepts(
                 eventTabId = tabId,
@@ -15399,11 +15802,37 @@ class BrowserController(
             expandThresholdPx = BOTTOM_BAR_EXPAND_THRESHOLD_DP * density,
         )
         browserChromeScrollStates[tabId] = update.state
+        if (update.compact == false) restoreAutoParkedAddressBar(tabId)
+        if (isAddressBarAutomaticallyParked) scheduleAutoParkedAddressBarProbe(350L)
+        if (isAddressBarSwipeModeEnabled) return
         update.compact?.let { compact ->
             if (bottomBarCompactStates[tabId] != compact) {
                 bottomBarCompactStates[tabId] = compact
             }
         }
+    }
+
+    private fun restoreAutoParkedAddressBar(tabId: String) {
+        val parked = autoParkedAddressBar?.takeIf { it.first == tabId } ?: return
+        if (!isAddressBarDocked || autoParkRestoreProbePending) return
+        val session = browserEngineSessions[tabId] ?: return
+        autoParkRestoreProbePending = true
+        mainHandler.postDelayed({
+            if (autoParkedAddressBar !== parked) return@postDelayed
+            session.probeTextInputOcclusion(parked.second, TextInputOcclusionProbeMode.AllEditors) { result ->
+                if (autoParkedAddressBar !== parked) return@probeTextInputOcclusion
+                autoParkRestoreProbePending = false
+                if (
+                    result != TextInputOcclusionProbeResult.Occluded &&
+                    selectedTabId == tabId &&
+                    browserEngineSessions[tabId] === session &&
+                    isAddressBarDocked &&
+                    isAddressBarAutoDockBrowserVisible()
+                ) {
+                    setAddressBarDockPlacement(null, manualRestoration = false)
+                }
+            }
+        }, 150L)
     }
 
     private fun onBrowserEngineScrollBarRefresh(
@@ -15473,6 +15902,7 @@ class BrowserController(
         media3CapturedOwner?.takeIf(::isCurrentMedia3Owner)?.tabId?.let(::add)
         media3BackgroundOwner?.takeIf(::isCurrentMedia3Owner)?.tabId?.let(::add)
         geckoMediaStates.filterValues { state -> state.isPlaying }.keys.forEach(::add)
+        browserEngineSessions.filterValues { it.hasActiveDownload() }.keys.forEach(::add)
         pendingPermissionAccess?.identity?.tabId?.let(::add)
         pendingHttpAuthChallenge?.tabId?.let(::add)
         pendingFileChooser?.identity?.tabId?.let(::add)
@@ -17409,6 +17839,7 @@ class BrowserController(
             }
         }
         savePersistentFilterRules()
+        scheduleMozillaTabsPublish()
     }
 
     private fun lockProfilesAfterBackground(nowElapsedRealtime: Long) {
@@ -17571,7 +18002,8 @@ class BrowserController(
         }
 
         val removedProfiles = profiles.filter { profile ->
-            profile.isSynced && profile.syncedDeviceId !in remoteById
+            profile.isSynced && profile.syncProvider == SyncProvider.Candy &&
+                profile.syncedDeviceId !in remoteById
         }
         if (removedProfiles.any { it.id == activeProfileId }) {
             selectProfileNow(localProfiles.first().id)
@@ -17655,6 +18087,64 @@ class BrowserController(
             }
         }
         persist()
+    }
+
+    private fun applyMozillaSyncState(state: MozillaSyncState) {
+        val previous = mozillaSyncState
+        mozillaSyncState = state
+        if (state.status == MozillaSyncStatus.Connected) {
+            val authTabId = mozillaAuthTabId
+            mozillaAuthTabId = null
+            mozillaAuthWebChannel?.close()
+            mozillaAuthWebChannel = null
+            authTabId?.let(::closeTab)
+        }
+        if (previous.localProfileId != state.localProfileId ||
+            previous.currentDeviceId != state.currentDeviceId ||
+            previous.status != state.status
+        ) {
+            lastPublishedMozillaTabs = null
+        }
+        profiles.indices.forEach { index ->
+            val profile = profiles[index]
+            if (!profile.isSynced) {
+                val linkedDeviceId = state.currentDeviceId.takeIf { profile.id == state.localProfileId }
+                if (profile.linkedMozillaDeviceId != linkedDeviceId) {
+                    profiles[index] = profile.copy(linkedMozillaDeviceId = linkedDeviceId)
+                }
+            }
+        }
+        val remoteDevices = state.devices.filterNot { it.id == state.currentDeviceId }
+        val remoteIds = remoteDevices.mapTo(hashSetOf()) { MozillaSyncRules.profileId(it.id) }
+        profiles.removeAll { it.syncProvider == SyncProvider.Mozilla && it.id !in remoteIds }
+        remoteDevices.forEach { device ->
+            val profile = MozillaSyncRules.profile(device)
+            val index = profiles.indexOfFirst { it.id == profile.id }
+            if (index >= 0) profiles[index] = profile else profiles += profile
+        }
+        if (remoteDevices.none { it.id == viewedMozillaDeviceId }) dismissMozillaDevice()
+        scheduleMozillaTabsPublish()
+    }
+
+    private fun scheduleMozillaTabsPublish() {
+        mainHandler.removeCallbacks(publishMozillaTabsRunnable)
+        if (mozillaSyncState.status == MozillaSyncStatus.Connected) {
+            mainHandler.postDelayed(publishMozillaTabsRunnable, 1_000L)
+        }
+    }
+
+    private fun publishMozillaTabs() {
+        val profileId = mozillaSyncState.localProfileId ?: return
+        if (localProfiles.none { it.id == profileId }) return
+        val eligibleTabs = MozillaSyncRules.localTabs(
+            tabs = tabs,
+            profileId = profileId,
+            excludedTabIds = tabs.filter { isSessionEphemeralTab(it.id) }
+                .mapTo(activeFederatedLoginFlowTabIds().toMutableSet(), BrowserTab::id),
+        )
+        if (eligibleTabs == lastPublishedMozillaTabs) return
+        lastPublishedMozillaTabs = eligibleTabs
+        mozillaSyncScope.launch { mozillaSyncRepository.sync(eligibleTabs) }
     }
 
     private fun publishUntrackedLinkedTabs(
@@ -18054,6 +18544,12 @@ class BrowserController(
         preserveFaviconGeneration: Boolean = false,
         preserveRestorableState: Boolean = false,
     ) {
+        if (tabId == mozillaAuthTabId) {
+            mozillaAuthTabId = null
+            mozillaAuthWebChannel?.close()
+            mozillaAuthWebChannel = null
+            mozillaSyncRepository.authenticationCancelled()
+        }
         formDrafts.deleteTab(tabId)
         closeBrowserEngineSession(tabId)
         if (!preserveRestorableState) {

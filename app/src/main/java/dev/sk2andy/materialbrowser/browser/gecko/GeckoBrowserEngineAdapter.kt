@@ -129,6 +129,11 @@ internal interface AndroidBrowserEngineSessionPort :
     BrowserEngineViewPort {
     fun setActive(active: Boolean)
 
+    fun bindMozillaAccountWebChannel(
+        handler: (String) -> String?,
+        onReady: (Boolean) -> Unit,
+    ): AutoCloseable? = null
+
     /** Marks an explicitly committed temporary preview as regular browsing content. */
     fun promoteToRegularTab() = Unit
 
@@ -177,6 +182,8 @@ internal interface AndroidBrowserEngineSessionPort :
     fun setCloseRequestListener(listener: GeckoCloseRequestListener?) = Unit
 
     fun setDownloadResponseListener(listener: GeckoDownloadResponseListener?) = Unit
+
+    fun hasActiveDownload(): Boolean = false
 
     fun startContextDownload(
         request: GeckoContextDownloadRequest,
@@ -513,6 +520,11 @@ internal class GeckoBrowserEngineSessionAdapter(
         if (!closed) session.bindToppingSession(tabId, BrowserEngineContentKind.RegularTab)
     }
 
+    override fun bindMozillaAccountWebChannel(
+        handler: (String) -> String?,
+        onReady: (Boolean) -> Unit,
+    ): AutoCloseable? = if (closed) null else session.bindMozillaAccountWebChannel(handler, onReady)
+
     @UiThread
     override fun execute(command: BrowserEngineCommand) {
         if (closed) return
@@ -685,6 +697,8 @@ internal class GeckoBrowserEngineSessionAdapter(
     override fun setDownloadResponseListener(listener: GeckoDownloadResponseListener?) {
         session.setDownloadResponseListener(if (closed) null else listener)
     }
+
+    override fun hasActiveDownload(): Boolean = !closed && session.hasActiveDownload()
 
     override fun startContextDownload(
         request: GeckoContextDownloadRequest,

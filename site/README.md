@@ -14,6 +14,17 @@ python3 -m http.server 4173 --directory site
 Open `http://127.0.0.1:4173/`. The privacy policy is available at `/privacy/` and the imprint at
 `/imprint/`.
 
+## Mozilla sign-in return
+
+`/oauth/mozilla/` is the earlier standalone OAuth return prototype. Current Android builds use
+Firefox Android's native WebChannel return instead and do not handle this page's app link.
+The page remains published, but must not be configured as the redirect for the Firefox client ID.
+
+The page removes the response from its browser-history entry and uses no analytics or browser
+storage. GitHub Pages receives the initial HTTPS request, including its query parameters.
+
+Run the callback checks with `node --test scripts/mozilla_oauth_callback.test.mjs`.
+
 ## Deployment
 
 `.github/workflows/pages.yml` deploys this directory after a push to `main`. Configure the repository's

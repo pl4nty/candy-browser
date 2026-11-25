@@ -225,11 +225,11 @@ android {
     namespace = "dev.sk2andy.materialbrowser"
     ndkVersion = "27.2.12479018"
     compileSdk = 37
-    compileSdkMinor = 1
+    compileSdkMinor = 2
 
     defaultConfig {
         applicationId = "dev.sk2andy.materialbrowser"
-        minSdk = 33
+        minSdk = 31
         targetSdk = 36
         versionCode = candyVersionCode.get().toInt()
         versionName = candyVersionName.get()
@@ -240,6 +240,9 @@ android {
         buildConfigField("boolean", "FOSS_DISTRIBUTION", "false")
         buildConfigField("boolean", "SYSTEM_WEBVIEW_ONLY", "false")
         buildConfigField("boolean", "TRUST_USER_CERTIFICATES", "false")
+        // Firefox Android's public client registration requires its native WebChannel return path.
+        buildConfigField("String", "MOZILLA_CLIENT_ID", "\"a2270f727f45f648\"")
+        buildConfigField("String", "MOZILLA_REDIRECT_URI", "\"urn:ietf:wg:oauth:2.0:oob:oauth-redirect-webchannel\"")
         buildConfigField(
             "boolean",
             "ENABLE_PERFORMANCE_DIAGNOSTICS",
@@ -722,7 +725,18 @@ listOf("release", "nightly").forEach { buildType ->
     }
 }
 
-val geckoViewDependency = "org.mozilla.geckoview:geckoview:157.0.20260924084938"
+val geckoViewDependency = "org.mozilla.geckoview:geckoview-omni:160.0.20261104181552"
+
+// GeckoView Omni supplies Glean's native library inside libxul; package it only once.
+configurations.configureEach {
+    resolutionStrategy.capabilitiesResolution.withCapability("org.mozilla.telemetry:glean-native") {
+        select(geckoViewDependency)
+    }
+}
+
+configurations.matching { it.name.startsWith("foss") }.configureEach {
+    exclude(group = "com.google.android.gms", module = "play-services-fido")
+}
 
 dependencies {
     implementation(project(":shared"))
@@ -742,8 +756,8 @@ dependencies {
     implementation("androidx.fragment:fragment-ktx:1.8.5")
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.8.7")
     implementation("androidx.lifecycle:lifecycle-process:2.8.7")
-    // GeckoView resolves Media3 core at 1.11.0; keep the system-session API on that same version.
-    implementation("androidx.media3:media3-session:1.11.0")
+    // GeckoView resolves Media3 core at 1.11.1; keep the system-session API on that same version.
+    implementation("androidx.media3:media3-session:1.11.1")
     implementation("androidx.swiperefreshlayout:swiperefreshlayout:1.2.0")
     implementation("androidx.webkit:webkit:1.16.0")
     implementation("androidx.work:work-runtime-ktx:2.11.2")
@@ -753,11 +767,14 @@ dependencies {
     implementation("org.jsoup:jsoup:1.23.2")
     implementation("com.microsoft.onnxruntime:onnxruntime-android:1.24.3")
     implementation("com.lambdapioneer.argon2kt:argon2kt:1.6.0")
+    implementation("org.mozilla.components:service-firefox-accounts:160.0")
+    implementation("org.mozilla.components:browser-storage-sync:160.0")
+    implementation("org.mozilla.components:support-appservices:160.0")
+    implementation("org.mozilla.components:lib-fetch-httpurlconnection:160.0")
+    implementation("org.mozilla.telemetry:glean:70.3.0")
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.8.1")
     "fullImplementation"(geckoViewDependency)
-    "fossImplementation"(geckoViewDependency) {
-        exclude(group = "com.google.android.gms", module = "play-services-fido")
-    }
+    "fossImplementation"(geckoViewDependency)
     "systemwebviewCompileOnly"(geckoViewDependency)
     implementation(platform("androidx.compose:compose-bom:2025.05.01"))
     implementation("androidx.compose.foundation:foundation")

@@ -17,6 +17,17 @@ Apache License 2.0 components
 
 License and terms links for current component groups are shown in Settings > About & legal.
 
+Mozilla Sync
+------------
+
+Mozilla Android Components 160.0 and Application Services 160.0 libraries are redistributed unmodified.
+The bundled Firefox Accounts WebChannel and native message handling are adapted from Android
+Components under MPL-2.0; modified source is in Candy's Gecko assets and data/sync packages.
+Source: https://github.com/mozilla-firefox/firefox/tree/FIREFOX_160_0_RELEASE/mobile/android/android-components
+Source and bundled dependency notices: https://github.com/mozilla/application-services/tree/v160.0
+Their Glean SDK dependency is available at https://github.com/mozilla/glean
+Mozilla Public License 2.0: https://www.mozilla.org/en-US/MPL/2.0/
+
 Offline speech
 --------------
 
@@ -35,6 +46,41 @@ complete GPL-3.0 license are provided in uassets.LICENSE.txt.
 
 HaGeZi Pro network-filter attribution, pinned source and revision, modification notice, and the
 complete GPL-3.0 license are provided in hagezi.LICENSE.txt.
+
+BareFilter
+----------
+
+System WebView uses adapted BareFilter rules from https://github.com/BareBrowser/bare-browser
+Revision: 9a20cee0014f49479764aaff05597f0fe3dd1e96
+
+BSD 3-Clause License
+
+Copyright (c) 2026 Bare contributors
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are met:
+
+1. Redistributions of source code must retain the above copyright notice, this
+   list of conditions and the following disclaimer.
+
+2. Redistributions in binary form must reproduce the above copyright notice,
+   this list of conditions and the following disclaimer in the documentation
+   and/or other materials provided with the distribution.
+
+3. Neither the name of the copyright holder nor the names of its
+   contributors may be used to endorse or promote products derived from
+   this software without specific prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 Gecko default extensions
 ------------------------

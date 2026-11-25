@@ -19,6 +19,13 @@
     },
     {
       "matches": ["http://*/*", "https://*/*"],
+      "js": ["webauthn_unavailable.js"],
+      "run_at": "document_start",
+      "all_frames": true,
+      "match_origin_as_fallback": true
+    },
+    {
+      "matches": ["http://*/*", "https://*/*"],
       "js": ["user_input.js"],
       "run_at": "document_start",
       "all_frames": true,

@@ -79,6 +79,7 @@ internal fun BrowserSettingsOverlay(
     onOpenFirefoxExtensions: (() -> Unit)? = null,
 ) {
     val context = LocalContext.current
+    val resources = remember(context, LocalConfiguration.current) { context.resources }
     val configuration = LocalConfiguration.current
     val appLanguagePreferences = remember(context) { AppLanguagePreferences(context) }
     var appLanguageTag by remember(appLanguagePreferences, configuration) {
@@ -251,6 +252,8 @@ internal fun BrowserSettingsOverlay(
                 controller.isFavoriteLaunchAnimationEnabled,
             favoriteAnimationSpeed = controller.favoriteAnimationSpeed,
             isOpenHomeOnStartupEnabled = controller.isOpenHomeOnStartupEnabled,
+            homePageSettings = controller.homePageSettings,
+            onHomePageSettingsChanged = controller::updateHomePageSettings,
             isScrollBarEnabled = controller.isScrollBarEnabled,
             isVideoAutoplayBlocked = controller.isVideoAutoplayBlocked,
             isVideoAutoplayBlockingSupported = controller.isVideoAutoplayBlockingSupported,
@@ -275,7 +278,7 @@ internal fun BrowserSettingsOverlay(
                     name = script.name,
                     source = script.source,
                     enabled = script.enabled,
-                    runAtLabel = context.getString(
+                    runAtLabel = resources.getString(
                         when (script.runAt) {
                             UserScriptRunAt.DocumentStart ->
                                 R.string.userscript_run_at_document_start
@@ -291,6 +294,12 @@ internal fun BrowserSettingsOverlay(
             toppingCatalogState = toppingCatalogState,
             syncState = controller.syncState,
             syncIconCatalog = controller.syncIconCatalog,
+            mozillaSyncState = controller.mozillaSyncState,
+            onConnectMozillaSync = { profileId, deviceName ->
+                if (controller.connectMozillaSync(profileId, deviceName)) onDismiss()
+            },
+            onRefreshMozillaSync = controller::refreshMozillaSync,
+            onDisconnectMozillaSync = controller::disconnectMozillaSync,
             onDestinationChanged = onDestinationChanged,
             onBrowserEngineKindChanged = controller::updateBrowserEngineKind,
             onAppearanceSettingsChanged = controller::updateAppearanceSettings,
@@ -372,7 +381,7 @@ internal fun BrowserSettingsOverlay(
                 if (controller.unlockDeveloperOptions()) {
                     Toast.makeText(
                         context,
-                        context.getString(R.string.developer_options_unlocked),
+                        resources.getString(R.string.developer_options_unlocked),
                         Toast.LENGTH_SHORT,
                     ).show()
                 }
@@ -386,7 +395,7 @@ internal fun BrowserSettingsOverlay(
                 controller.setUserScriptEnabled(id, enabled) { saved ->
                     onResult(
                         if (saved) null
-                        else context.getString(R.string.userscript_error_generic),
+                        else resources.getString(R.string.userscript_error_generic),
                     )
                 }
             },
@@ -394,7 +403,7 @@ internal fun BrowserSettingsOverlay(
                 controller.setUserScriptFrameScope(id, scope) { saved ->
                     onResult(
                         if (saved) null
-                        else context.getString(R.string.userscript_error_generic),
+                        else resources.getString(R.string.userscript_error_generic),
                     )
                 }
             },
@@ -403,7 +412,7 @@ internal fun BrowserSettingsOverlay(
                     onResult(
                         when (outcome) {
                             UserScriptSaveOutcome.Saved -> null
-                            UserScriptSaveOutcome.LimitReached -> context.getString(
+                            UserScriptSaveOutcome.LimitReached -> resources.getString(
                                 R.string.userscript_error_limit,
                                 UserScriptParser.MAX_SCRIPTS,
                             )
@@ -411,7 +420,7 @@ internal fun BrowserSettingsOverlay(
                             UserScriptSaveOutcome.PersistenceFailed,
                             is UserScriptSaveOutcome.Rejected,
                             is UserScriptSaveOutcome.DependencyFailed,
-                            -> context.getString(R.string.userscript_error_generic)
+                            -> resources.getString(R.string.userscript_error_generic)
                         },
                     )
                 }
@@ -420,7 +429,7 @@ internal fun BrowserSettingsOverlay(
                 controller.deleteUserScript(id) { deleted ->
                     onResult(
                         if (deleted) null
-                        else context.getString(R.string.userscript_error_generic),
+                        else resources.getString(R.string.userscript_error_generic),
                     )
                 }
             },
@@ -430,7 +439,7 @@ internal fun BrowserSettingsOverlay(
                     if (!saved) {
                         Toast.makeText(
                             context,
-                            context.getString(R.string.topping_catalog_action_error),
+                            resources.getString(R.string.topping_catalog_action_error),
                             Toast.LENGTH_SHORT,
                         ).show()
                     }
@@ -441,7 +450,7 @@ internal fun BrowserSettingsOverlay(
                     if (!saved) {
                         Toast.makeText(
                             context,
-                            context.getString(R.string.topping_catalog_action_error),
+                            resources.getString(R.string.topping_catalog_action_error),
                             Toast.LENGTH_SHORT,
                         ).show()
                     }

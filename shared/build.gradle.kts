@@ -80,10 +80,10 @@ tasks.register<Exec>("iosSimulatorArm64IsolatedTest") {
 android {
     namespace = "dev.sk2andy.materialbrowser.shared"
     compileSdk = 37
-    compileSdkMinor = 1
+    compileSdkMinor = 2
 
     defaultConfig {
-        minSdk = 33
+        minSdk = 31
     }
 
     compileOptions {

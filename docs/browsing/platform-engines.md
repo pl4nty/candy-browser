@@ -237,7 +237,7 @@ Camera and microphone permissions remain separate and continue through Candy's p
 
 ## Gecko crash helper startup
 
-The resolved GeckoView `157.0.20260924084938` AAR always starts the crash-helper service.
+The previously tested GeckoView `157.0.20260924084938` AAR always starts the crash-helper service.
 `crashHandler(null)` and `MOZ_CRASHREPORTER_DISABLE` do not disable it. The native Android
 `CrashReporter::OOPInit` deliberately bypasses the reporting-enabled check and always connects
 to the helper. Skipping Java startup and returning invalid pipe descriptors crashes in native
@@ -386,7 +386,8 @@ and [native Android IPC connector](https://github.com/mozilla-firefox/firefox/bl
   lifecycle exit or session replacement denies the pending request. File results accept only bounded
   readable `content://` URIs. Private permission decisions remain memory-only, and authentication
   credentials are neither stored nor logged.
-- Gecko WebAuthn launches Android's passkey provider through the resumed `MainActivity`. Candy accepts
+- Pending privileged-browser approval, Gecko hides WebAuthn from page feature detection; System WebView
+  disables it. Gecko retains its passkey provider integration through the resumed `MainActivity`. Candy accepts
   `RESULT_OK` even when the provider returns no `Intent`, but completes Gecko's pending result only
   after the host resumes with the initiating tab, Gecko session and navigation generation unchanged.
   The source tab is exempt from immediate background eviction for that round trip; a stale or destroyed
@@ -407,8 +408,9 @@ and [native Android IPC connector](https://github.com/mozilla-firefox/firefox/bl
 - GeckoView 155 prompt policy is explicit. Candy presents alert, confirm, text, before-unload, repost,
   file and host-auth prompts. Explicit image/video capture uses a scoped MediaStore URI and honors
   Gecko's front (`USER`) versus rear (`ENVIRONMENT`) camera hint; cancellation, navigation, tab changes
-  and lifecycle loss delete the pending row. Regular HTTPS login save/select uses Android Credential Manager without
-  an app credential database; GeckoView also exposes its native virtual Autofill structure. FedCM
+  and lifecycle loss delete the pending row. On Android 14 and newer, regular HTTPS login save/select uses
+  Android Credential Manager without an app credential database. GeckoView also exposes native virtual
+  Autofill nodes, including on Android 13 and older where origin-bound Credential Manager calls are unavailable. FedCM
   provider, account and privacy-policy prompts use the engine-neutral credential host and reject
   private, inactive, cross-origin or stale requests. Address/card autocomplete, HTML automatic
   popups and client certificates remain fail closed. Choice, color, date/time and folder
@@ -421,7 +423,7 @@ and [native Android IPC connector](https://github.com/mozilla-firefox/firefox/bl
   no prompt silently falls through a nullable Gecko delegate default.
 - Cleartext HTTP password-manager access is an explicit, default-off GeckoView-only Developer
   option with a separate warning confirmation. A user must tap a login field before Candy can open the default Android password manager;
-  automatic filling and saving remain disabled. The option never expands FedCM, passkeys, private
+  it requires Android 14 or newer, and automatic filling and saving remain disabled. The option never expands FedCM, passkeys, private
   tabs, Link Peek or external-link previews. Android System WebView keeps Android Autofill enabled for
   supported secure pages, but its public API cannot mark selected HTTP origins as secure, so Candy
   shows the option disabled in that engine and recommends HTTPS or GeckoView.
@@ -467,7 +469,8 @@ and [native Android IPC connector](https://github.com/mozilla-firefox/firefox/bl
   inactivity as a complete network suspension.
 - Manual extension installation accepts only direct HTTPS URLs and delegates XPI parsing and Mozilla
   signature validation to GeckoView. The user must explicitly approve requested permissions;
-  dismissal and lifecycle failure deny access.
+  dismissal and lifecycle failure deny access. The URL field requests a URI keyboard with
+  autocorrection and automatic capitalization disabled so typed package addresses remain unchanged.
 - Android's Gecko runtime provisions two normal, deinstallable defaults through
   `WebExtensionController.install(..., INSTALLATION_METHOD_ONBOARDING)`. uBlock Origin `1.75.0`
   ships as the original Mozilla-signed AMO XPI, so a clean profile gets it without network access.
@@ -646,11 +649,15 @@ implements them.
   disabled in private browsing, and is hidden from the Firefox extension manager. Regular first
   navigation waits for its bounded initialization gate so cold-start `document-start` scripts are
   not missed.
-- GeckoView `157.0.20260924084938` is pinned with Android SDK 37.1, AGP 9.4.0 and Gradle 9.6.0.
-  `minSdk` remains 33 and `targetSdk` remains 36. Gecko upgrades stay coordinated toolchain changes,
+- GeckoView `160.0.20261104181552` is pinned with Android SDK 37.2, AGP 9.4.0 and Gradle 9.6.0.
+  `minSdk` remains 31 and `targetSdk` remains 36. Gecko upgrades stay coordinated toolchain changes,
   not floating dependency bumps.
   The [155 to 157 upgrade audit](../audits/geckoview-157-upgrade.md) records API compatibility,
   transitive dependency changes, upstream fixes and device regression evidence.
+  The [159 eMudhra audit](../audits/geckoview-159-emudhra.md) records bundled revocation evidence
+  and the scope of the emulator check.
+- GeckoView 160 validates the `Content-Disposition` filename before delivering an external response;
+  Candy still applies its own download filename rules. See the [GeckoView API changelog](https://mozilla.github.io/geckoview/javadoc/mozilla-central/org/mozilla/geckoview/doc-files/CHANGELOG#v160-heading1).
 - Browser commands clear Gecko data through a typed runtime seam. **Clear cache & reload** uses only
   `StorageController.ClearFlags.ALL_CACHES`; **Clear cookies & reload** uses only `COOKIES` and is
   deliberately labeled as affecting all Candy browser profiles because GeckoView 155 exposes no

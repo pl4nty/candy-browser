@@ -8,16 +8,19 @@ import android.content.Context
 import android.net.Uri
 import android.os.Handler
 import android.os.Looper
+import android.os.SystemClock
 import android.provider.MediaStore
 import dev.sk2andy.materialbrowser.browser.downloads.CandyDownloadNotifier
 import dev.sk2andy.materialbrowser.data.BrowserDownloadRequestFactory
 import dev.sk2andy.materialbrowser.data.BrowserSessionStore
 import dev.sk2andy.materialbrowser.data.DownloadDirectoryRules
 import dev.sk2andy.materialbrowser.data.DownloadRuntimeRegistry
+import dev.sk2andy.materialbrowser.data.DownloadStatus
 import dev.sk2andy.materialbrowser.data.DownloadEntryIds
 import dev.sk2andy.materialbrowser.data.DownloadProvenanceStore
 import dev.sk2andy.materialbrowser.data.SafeDownloadValues
 import java.io.Closeable
+import java.io.IOException
 import java.io.OutputStream
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.Executors
@@ -163,17 +166,27 @@ internal class GeckoDownloadTransferManager(
     context: Context,
     private val executor: GeckoWebExecutor,
     private val sink: GeckoDownloadStreamSink = MediaStoreDownloadStreamSink(context),
-    private val notifier: CandyDownloadNotifier = CandyDownloadNotifier(context),
+    private val notifier: CandyDownloadNotifier = CandyDownloadNotifier(context, groupWithForegroundService = true),
 ) : AutoCloseable {
     private class Operation(
         val ownerKey: Any,
         val sourceProfileId: String,
         val isPrivate: Boolean,
+        val transfer: GeckoDownloadTransferRequest? = null,
         val cancelled: AtomicBoolean = AtomicBoolean(false),
         val terminal: AtomicBoolean = AtomicBoolean(false),
     ) {
         @Volatile var response: WebResponse? = null
         @Volatile var entry: GeckoDownloadStreamEntry? = null
+        var etag: String? = null
+        var received = 0L
+        var paused = false
+        var restartRequired = false
+        var copying = false
+        var fetching = false
+        var fetchGeneration = 0L
+        var networkRetries = 0
+        var lastProgressNotification = 0L
     }
 
     private val io = Executors.newCachedThreadPool { runnable ->
@@ -182,6 +195,7 @@ internal class GeckoDownloadTransferManager(
     private val operations = ConcurrentHashMap<Int, Operation>()
     private val closed = AtomicBoolean(false)
     private val mainHandler = Handler(Looper.getMainLooper())
+    private val appContext = context.applicationContext
     private val provenance = DownloadProvenanceStore(context.applicationContext)
 
     @SuppressLint("WrongConstant") // Gecko combines these @IntDef bit flags at runtime.
@@ -189,36 +203,70 @@ internal class GeckoDownloadTransferManager(
         transfer: GeckoDownloadTransferRequest,
         listener: GeckoDownloadTransferListener,
     ): GeckoDownloadCancellation? {
-        if (closed.get() || !isValid(transfer)) {
+        val pendingRequest = BrowserDownloadRequestFactory.create(transfer.request.uri)
+        if (closed.get() || transfer.owner.profileId.isBlank() || pendingRequest == null) {
             dispatch { listener.onFailed(GeckoDownloadFailure.InvalidRequest) }
             return null
         }
         val id = DownloadRuntimeRegistry.nextTransferId()
-        val operation = Operation(transfer.owner.sessionKey, transfer.owner.profileId, transfer.owner.isPrivate)
-        operations[id] = operation
+        val operation = Operation(transfer.owner.sessionKey, transfer.owner.profileId, transfer.owner.isPrivate, transfer)
+        synchronized(operation) {
+            operations[id] = operation
+            DownloadRuntimeRegistry.started(
+                id = id,
+                name = pendingRequest.fileName,
+                source = "",
+                mime = pendingRequest.mimeType,
+                total = -1L,
+                startedAt = System.currentTimeMillis(),
+                cancel = { cancel(id, operation, listener) },
+                isPrivate = operation.isPrivate,
+                status = DownloadStatus.Pending,
+            )
+            notifier.started(id)
+            if (!keepForeground(id, operation, listener)) {
+                fail(id, operation, listener, GeckoDownloadFailure.Network)
+                return null
+            }
+        }
         val flags = transfer.fetchFlags or if (transfer.owner.isPrivate) {
             GeckoWebExecutor.FETCH_FLAGS_PRIVATE
         } else {
             GeckoWebExecutor.FETCH_FLAGS_NONE
         }
-        executor.fetch(transfer.request, flags).accept(
-            { response ->
-                if (response == null) {
-                    fail(id, operation, listener, GeckoDownloadFailure.Network)
+        fun fetch(retried: Boolean) {
+            if (operation.terminal.get()) return
+            fun onNetworkFailure() {
+                if (!retried && transfer.request.method.equals("GET", ignoreCase = true) &&
+                    transfer.request.body == null
+                ) {
+                    fetch(retried = true)
                 } else {
-                    receiveResponse(
-                        id = id,
-                        operation = operation,
-                        response = response,
-                        suggestedFileName = transfer.suggestedFileName,
-                        referrer = transfer.request.referrer,
-                        allowHttpErrors = transfer.allowHttpErrors,
-                        listener = listener,
-                    )
+                    fail(id, operation, listener, GeckoDownloadFailure.Network)
                 }
-            },
-            { fail(id, operation, listener, GeckoDownloadFailure.Network) },
-        )
+            }
+            runCatching {
+                executor.fetch(transfer.request, flags).accept(
+                    { response ->
+                        if (response == null) {
+                            onNetworkFailure()
+                        } else {
+                            receiveResponse(
+                                id = id,
+                                operation = operation,
+                                response = response,
+                                suggestedFileName = transfer.suggestedFileName,
+                                referrer = transfer.request.referrer,
+                                allowHttpErrors = transfer.allowHttpErrors,
+                                listener = listener,
+                            )
+                        }
+                    },
+                    { onNetworkFailure() },
+                )
+            }.onFailure { onNetworkFailure() }
+        }
+        fetch(retried = false)
         return GeckoDownloadCancellation {
             cancel(id, operation, listener)
         }
@@ -239,6 +287,11 @@ internal class GeckoDownloadTransferManager(
         val id = DownloadRuntimeRegistry.nextTransferId()
         val operation = Operation(owner.sessionKey, owner.profileId, owner.isPrivate)
         operations[id] = operation
+        if (!keepForeground(id, operation, listener)) {
+            runCatching { response.body?.close() }
+            fail(id, operation, listener, GeckoDownloadFailure.Network)
+            return null
+        }
         receiveResponse(
             id = id,
             operation = operation,
@@ -251,6 +304,9 @@ internal class GeckoDownloadTransferManager(
         return GeckoDownloadCancellation { cancel(id, operation, listener) }
     }
 
+    fun hasActiveForOwner(ownerKey: Any): Boolean =
+        operations.values.any { operation -> operation.ownerKey === ownerKey && !operation.terminal.get() }
+
     fun cancelOwner(ownerKey: Any) {
         operations.entries
             .filter { (_, operation) -> operation.ownerKey === ownerKey }
@@ -261,6 +317,14 @@ internal class GeckoDownloadTransferManager(
         if (!closed.compareAndSet(false, true)) return
         operations.entries.toList().forEach { (id, operation) -> cancel(id, operation, null) }
         io.shutdownNow()
+    }
+
+    private fun keepForeground(
+        id: Int,
+        operation: Operation,
+        listener: GeckoDownloadTransferListener,
+    ): Boolean = GeckoDownloadForegroundService.begin(appContext, id) {
+        cancel(id, operation, listener, GeckoDownloadFailure.Network)
     }
 
     private fun receiveResponse(
@@ -304,6 +368,18 @@ internal class GeckoDownloadTransferManager(
             safeMimeType,
         )
         val totalBytes = response.header("content-length")?.toLongOrNull()?.coerceAtLeast(-1L) ?: -1L
+        val transfer = operation.transfer
+        val etag = response.header("etag")
+        val canResume = transfer != null && transfer.request.method.equals("GET", ignoreCase = true) &&
+            transfer.request.body == null && transfer.request.uri == response.uri && !response.redirected &&
+            response.statusCode == 200 && totalBytes > 0 &&
+            etag != null && etag.startsWith('"') && etag.endsWith('"') &&
+            response.header("accept-ranges")?.equals("bytes", ignoreCase = true) == true &&
+            response.header("content-encoding").let { it == null || it.equals("identity", ignoreCase = true) } &&
+            transfer.request.headers.keys.none { name ->
+                name.equals("range", ignoreCase = true) || name.startsWith("if-", ignoreCase = true) ||
+                    name.equals("accept-encoding", ignoreCase = true)
+            }
         val entry = runCatching { sink.open(safeFileName, safeMimeType) }.getOrElse {
             runCatching(body::close)
             fail(id, operation, listener, GeckoDownloadFailure.Storage)
@@ -326,6 +402,8 @@ internal class GeckoDownloadTransferManager(
                 return
             }
             operation.entry = entry
+            operation.etag = etag.takeIf { canResume }
+            operation.copying = true
             runCatching { ContentUris.parseId(entry.uri) }.getOrNull()?.let { mediaId ->
                 provenance.record(
                     DownloadEntryIds.encodeMediaStoreId(mediaId),
@@ -343,6 +421,8 @@ internal class GeckoDownloadTransferManager(
                 startedAt = started.startedAtMillis,
                 mediaStoreId = runCatching { ContentUris.parseId(entry.uri) }.getOrNull(),
                 cancel = { cancel(id, operation, listener) },
+                pause = if (canResume) ({ setPaused(id, operation, started, listener, true) }) else null,
+                resume = if (canResume) ({ setPaused(id, operation, started, listener, false) }) else null,
                 isPrivate = operation.isPrivate,
             )
             dispatch { listener.onStarted(started) }
@@ -358,29 +438,42 @@ internal class GeckoDownloadTransferManager(
         started: GeckoDownloadTransferStart,
         listener: GeckoDownloadTransferListener,
     ) {
-        var received = 0L
+        var readFailed = false
+        var writeFailed = false
         val result = runCatching {
             body.use { input ->
                 val entry = checkNotNull(operation.entry)
-                entry.output.use { output ->
-                    val buffer = ByteArray(COPY_BUFFER_BYTES)
-                    while (true) {
-                        if (operation.cancelled.get()) throw DownloadCancelledException()
-                        val count = input.read(buffer)
-                        if (count < 0) break
-                        output.write(buffer, 0, count)
-                        received += count
-                        val progress = received
-                        synchronized(operation) {
-                            if (operation.cancelled.get() || operation.terminal.get()) {
-                                throw DownloadCancelledException()
-                            }
-                            DownloadRuntimeRegistry.progress(
-                                id = id,
-                                bytes = progress,
-                                total = started.totalBytes,
-                                updatedAt = System.currentTimeMillis(),
-                            )
+                val buffer = ByteArray(COPY_BUFFER_BYTES)
+                while (true) {
+                    if (operation.cancelled.get()) throw DownloadCancelledException()
+                    val count = try {
+                        input.read(buffer)
+                    } catch (error: IOException) {
+                        readFailed = true
+                        throw error
+                    }
+                    if (count < 0) break
+                    try {
+                        entry.output.write(buffer, 0, count)
+                    } catch (error: Exception) {
+                        writeFailed = true
+                        throw error
+                    }
+                    synchronized(operation) {
+                        if (operation.cancelled.get() || operation.terminal.get()) {
+                            throw DownloadCancelledException()
+                        }
+                        operation.received += count
+                        val progress = operation.received
+                        DownloadRuntimeRegistry.progress(
+                            id = id,
+                            bytes = progress,
+                            total = started.totalBytes,
+                            updatedAt = System.currentTimeMillis(),
+                        )
+                        val now = SystemClock.elapsedRealtime()
+                        if (operation.lastProgressNotification == 0L || now - operation.lastProgressNotification >= 250L) {
+                            operation.lastProgressNotification = now
                             dispatch { listener.onProgress(progress, started.totalBytes) }
                             notifier.progress(started.id)
                         }
@@ -388,9 +481,34 @@ internal class GeckoDownloadTransferManager(
                 }
             }
         }
+        if (writeFailed) {
+            finishFailure(id, operation, listener, GeckoDownloadFailure.Storage)
+            return
+        }
+        synchronized(operation) {
+            operation.copying = false
+            if (!operation.terminal.get() && operation.restartRequired && operation.received < started.totalBytes) {
+                if (!operation.paused) resumeTransfer(id, operation, started, listener)
+                return
+            }
+            if (
+                !operation.terminal.get() && operation.etag != null &&
+                operation.received < started.totalBytes && (readFailed || result.isSuccess)
+            ) {
+                if (operation.networkRetries++ == 0) {
+                    resumeTransfer(id, operation, started, listener)
+                } else {
+                    pauseAfterNetworkError(id, operation)
+                }
+                return
+            }
+        }
         if (operation.cancelled.get() || result.exceptionOrNull() is DownloadCancelledException) {
             finishFailure(id, operation, listener, GeckoDownloadFailure.Cancelled)
-        } else if (result.isFailure) {
+        } else if (
+            (result.isFailure && !(operation.restartRequired && operation.received == started.totalBytes)) ||
+            (operation.etag != null && operation.received != started.totalBytes)
+        ) {
             finishFailure(id, operation, listener, GeckoDownloadFailure.Network)
         } else {
             synchronized(operation) {
@@ -399,8 +517,9 @@ internal class GeckoDownloadTransferManager(
                     onSuccess = {
                         if (!operation.terminal.compareAndSet(false, true)) return@fold
                         operations.remove(id, operation)
+                        GeckoDownloadForegroundService.end(id)
                         DownloadRuntimeRegistry.completed(id)
-                        dispatch { listener.onComplete(received) }
+                        dispatch { listener.onComplete(operation.received) }
                         operation.entry?.uri?.let { uri ->
                             notifier.complete(
                                 transferId = started.id,
@@ -418,10 +537,121 @@ internal class GeckoDownloadTransferManager(
         }
     }
 
+    private fun pauseAfterNetworkError(id: Int, operation: Operation) {
+        operation.paused = true
+        operation.restartRequired = true
+        GeckoDownloadForegroundService.end(id)
+        DownloadRuntimeRegistry.paused(id, true, System.currentTimeMillis())
+        notifier.paused(id)
+    }
+
+    private fun setPaused(
+        id: Int,
+        operation: Operation,
+        started: GeckoDownloadTransferStart,
+        listener: GeckoDownloadTransferListener,
+        paused: Boolean,
+    ): Boolean = synchronized(operation) {
+        if (operation.terminal.get() || operation.paused == paused) return false
+        if (!paused && !keepForeground(id, operation, listener)) return false
+        operation.paused = paused
+        DownloadRuntimeRegistry.paused(id, paused, System.currentTimeMillis())
+        notifier.paused(id)
+        if (paused) {
+            operation.restartRequired = true
+            operation.fetchGeneration++
+            operation.fetching = false
+            runCatching { operation.response?.body?.close() }
+            GeckoDownloadForegroundService.end(id)
+        } else if (!operation.copying && !operation.fetching) {
+            resumeTransfer(id, operation, started, listener)
+        }
+        true
+    }
+
+    @SuppressLint("WrongConstant")
+    private fun resumeTransfer(
+        id: Int,
+        operation: Operation,
+        started: GeckoDownloadTransferStart,
+        listener: GeckoDownloadTransferListener,
+    ) {
+        val transfer = checkNotNull(operation.transfer)
+        val etag = checkNotNull(operation.etag)
+        val offset = operation.received
+        operation.fetching = true
+        val fetchGeneration = ++operation.fetchGeneration
+        val request = WebRequest.Builder(transfer.request.uri)
+            .method("GET")
+            .cacheMode(transfer.request.cacheMode)
+            .beConservative(transfer.request.beConservative)
+            .apply {
+                transfer.request.referrer?.let(::referrer)
+                transfer.request.headers.forEach { (name, value) -> header(name, value) }
+                header("Accept-Encoding", "identity")
+                header("Range", "bytes=$offset-")
+                header("If-Range", etag)
+            }.build()
+        val flags = transfer.fetchFlags or if (operation.isPrivate) {
+            GeckoWebExecutor.FETCH_FLAGS_PRIVATE
+        } else {
+            GeckoWebExecutor.FETCH_FLAGS_NONE
+        }
+        dispatch {
+            synchronized(operation) {
+                if (operation.terminal.get() || operation.paused || operation.fetchGeneration != fetchGeneration) {
+                    return@dispatch
+                }
+            }
+            val onFailure = {
+                synchronized(operation) {
+                    if (!operation.terminal.get() && !operation.paused && operation.fetchGeneration == fetchGeneration) {
+                        operation.fetching = false
+                        pauseAfterNetworkError(id, operation)
+                    }
+                }
+            }
+            runCatching {
+                executor.fetch(request, flags).accept(
+                    { response ->
+                        synchronized(operation) {
+                            if (operation.terminal.get() || operation.paused || operation.fetchGeneration != fetchGeneration) {
+                                runCatching { response?.body?.close() }
+                                return@synchronized
+                            }
+                            operation.fetching = false
+                            if (response == null || response.statusCode in 500..599) {
+                                runCatching { response?.body?.close() }
+                                pauseAfterNetworkError(id, operation)
+                            } else if (
+                                response.body == null || response.statusCode != 206 ||
+                                response.redirected || response.uri != started.sourceUrl ||
+                                response.header("etag") != etag ||
+                                response.header("content-range") != "bytes $offset-${started.totalBytes - 1}/${started.totalBytes}" ||
+                                response.header("content-length")?.toLongOrNull() != started.totalBytes - offset ||
+                                response.header("content-encoding").let { it != null && !it.equals("identity", ignoreCase = true) }
+                            ) {
+                                runCatching { response.body?.close() }
+                                finishFailure(id, operation, listener, GeckoDownloadFailure.Network)
+                            } else {
+                                operation.response = response
+                                operation.restartRequired = false
+                                operation.copying = true
+                                io.execute { copy(id, operation, response.body!!, started, listener) }
+                            }
+                        }
+                    },
+                    { onFailure() },
+                )
+            }.onFailure { onFailure() }
+        }
+    }
+
     private fun cancel(
         id: Int,
         operation: Operation,
         listener: GeckoDownloadTransferListener?,
+        failure: GeckoDownloadFailure = GeckoDownloadFailure.Cancelled,
     ) {
         synchronized(operation) {
             if (!operation.terminal.compareAndSet(false, true)) return
@@ -429,13 +659,14 @@ internal class GeckoDownloadTransferManager(
             runCatching { operation.response?.body?.close() }
             runCatching { operation.entry?.abort() }
             operations.remove(id, operation)
+            GeckoDownloadForegroundService.end(id)
             DownloadRuntimeRegistry.failed(
                 id = id,
-                cancelled = true,
+                cancelled = failure == GeckoDownloadFailure.Cancelled,
                 updatedAt = System.currentTimeMillis(),
             )
-            notifier.cancel(id)
-            listener?.let { target -> dispatch { target.onFailed(GeckoDownloadFailure.Cancelled) } }
+            if (failure == GeckoDownloadFailure.Cancelled) notifier.cancel(id) else notifier.failed(id)
+            listener?.let { target -> dispatch { target.onFailed(failure) } }
         }
     }
 
@@ -448,13 +679,14 @@ internal class GeckoDownloadTransferManager(
         synchronized(operation) {
             if (!operation.terminal.compareAndSet(false, true)) return
             operations.remove(id, operation)
+            GeckoDownloadForegroundService.end(id)
             DownloadRuntimeRegistry.failed(
                 id = id,
                 cancelled = failure == GeckoDownloadFailure.Cancelled,
                 updatedAt = System.currentTimeMillis(),
             )
             dispatch { listener.onFailed(failure) }
-            notifier.cancel(id)
+            if (failure == GeckoDownloadFailure.Cancelled) notifier.cancel(id) else notifier.failed(id)
         }
     }
 
@@ -469,19 +701,16 @@ internal class GeckoDownloadTransferManager(
             operation.cancelled.set(true)
             runCatching { operation.entry?.abort() }
             operations.remove(id, operation)
+            GeckoDownloadForegroundService.end(id)
             DownloadRuntimeRegistry.failed(
                 id = id,
                 cancelled = failure == GeckoDownloadFailure.Cancelled,
                 updatedAt = System.currentTimeMillis(),
             )
             dispatch { listener.onFailed(failure) }
-            notifier.cancel(id)
+            if (failure == GeckoDownloadFailure.Cancelled) notifier.cancel(id) else notifier.failed(id)
         }
     }
-
-    private fun isValid(transfer: GeckoDownloadTransferRequest): Boolean =
-        transfer.owner.profileId.isNotBlank() &&
-            BrowserDownloadRequestFactory.create(url = transfer.request.uri) != null
 
     private fun dispatch(action: () -> Unit) {
         if (Looper.myLooper() == Looper.getMainLooper()) action() else mainHandler.post(action)
