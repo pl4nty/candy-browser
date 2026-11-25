@@ -1122,7 +1122,17 @@ test('viewport-cover sticky header gets a theme-color backdrop before scroll wit
   assert.deepEqual(f.fallbacks, []);
 });
 
-test('status backdrop requires an opaque theme color and a pinned header below the inset', () => {
+test('cover backdrop without theme-color uses the resolved header background', () => {
+  const f = fixture({ viewportContent: 'viewport-fit=cover' });
+  const header = f.element('sticky', '32px', 'header');
+  header.rect = { top: 32, left: 0, width: 800, height: 56, right: 800, bottom: 88 };
+  header.computed.backgroundColor = 'rgb(253, 253, 247)';
+  f.start();
+  assert.deepEqual(f.backdrops, [[1, 1, '#fdfdf7']]);
+  assert.deepEqual(f.fallbacks, []);
+});
+
+test('status backdrop requires an opaque color and a pinned header below the inset', () => {
   const noTheme = fixture({ viewportContent: 'viewport-fit=cover' });
   noTheme.element('sticky', '32px', 'header').rect =
     { top: 32, left: 0, width: 800, height: 56, right: 800, bottom: 88 };
